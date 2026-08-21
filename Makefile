@@ -1,6 +1,6 @@
 # Makefile for Go Development & Custom Skills Management
 
-.PHONY: help check install self-eval generate test fmt lint tidy vulncheck build release-check release-snapshot license-check license-add migration-diff clean openapi-lint publish-pr ai-pr
+.PHONY: help check install self-eval generate test fmt lint tidy vulncheck build release-check release-snapshot license-check license-add migration-diff clean openapi-lint publish-pr ai-pr demo docker-e2e grafana-e2e
 
 help:
 	@echo "Available commands:"
@@ -12,6 +12,9 @@ help:
 	@echo "    tidy             Run go mod tidy"
 	@echo "    vulncheck        Run govulncheck vulnerability scanner"
 	@echo "    test             Run Go tests with race detector and coverage"
+	@echo "    demo             Run full-stack live demo with Docker Compose"
+	@echo "    docker-e2e       Run end-to-end test suite against Docker Compose stack"
+	@echo "    grafana-e2e      Run Grafana UI test, value assertions & HTML report generation"
 	@echo "    build            Build binary to bin/app"
 	@echo "    release-check    Validate GoReleaser configuration"
 	@echo "    release-snapshot Run GoReleaser snapshot build"
@@ -67,15 +70,24 @@ vulncheck:
 test: generate
 	@bash scripts/check_coverage.sh
 
+demo:
+	@echo "==> Running live demo with Docker Compose..."
+	@bash scripts/demo.sh
+
+docker-e2e:
+	@echo "==> Running Docker E2E test suite..."
+	@bash scripts/docker_e2e.sh
+
+grafana-e2e:
+	@echo "==> Running Grafana UI E2E test & HTML report generation..."
+	@python3 scripts/test_grafana_ui.py
+
 build: generate
-	@echo "==> Building binary..."
+	@echo "==> Building binaries..."
 	@mkdir -p bin
-	@if [ -d "./cmd" ] && [ -n "$$(ls -A ./cmd 2>/dev/null)" ]; then \
-		go build -v -o bin/ ./cmd/...; \
-	else \
-		echo "==> No cmd executables in this layer, compiling packages..."; \
-		go test -run=^$$ ./...; \
-	fi
+	@go build -v -o bin/musubi-server ./cmd/musubi-server
+	@go build -v -o bin/musubi-cli ./cmd/musubi-cli
+	@go build -v -o bin/mock-snmp-agent ./cmd/mock-snmp-agent
 
 release-check:
 	@echo "==> Validating GoReleaser configuration..."
