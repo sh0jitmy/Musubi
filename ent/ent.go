@@ -12,6 +12,14 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
+	"github.com/shjtmy/go_sh0jitmy_template/ent/auditlog"
+	"github.com/shjtmy/go_sh0jitmy_template/ent/credentialprofile"
+	"github.com/shjtmy/go_sh0jitmy_template/ent/job"
+	"github.com/shjtmy/go_sh0jitmy_template/ent/jobstep"
+	"github.com/shjtmy/go_sh0jitmy_template/ent/scenario"
+	"github.com/shjtmy/go_sh0jitmy_template/ent/scenarioversion"
+	"github.com/shjtmy/go_sh0jitmy_template/ent/statetransitionlog"
+	"github.com/shjtmy/go_sh0jitmy_template/ent/target"
 	"github.com/shjtmy/go_sh0jitmy_template/ent/user"
 )
 
@@ -73,7 +81,15 @@ var (
 func checkColumn(t, c string) error {
 	initCheck.Do(func() {
 		columnCheck = sql.NewColumnCheck(map[string]func(string) bool{
-			user.Table: user.ValidColumn,
+			auditlog.Table:           auditlog.ValidColumn,
+			credentialprofile.Table:  credentialprofile.ValidColumn,
+			job.Table:                job.ValidColumn,
+			jobstep.Table:            jobstep.ValidColumn,
+			scenario.Table:           scenario.ValidColumn,
+			scenarioversion.Table:    scenarioversion.ValidColumn,
+			statetransitionlog.Table: statetransitionlog.ValidColumn,
+			target.Table:             target.ValidColumn,
+			user.Table:               user.ValidColumn,
 		})
 	})
 	return columnCheck(t, c)

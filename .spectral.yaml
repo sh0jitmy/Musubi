@@ -9,7 +9,7 @@ rules:
     then:
       function: pattern
       functionOptions:
-        match: "^\\/(v[0-9]+|login|logout|auth|token|me|[a-z0-9-]+s|\\{[a-zA-Z0-9_-]+\\})(\\/(login|logout|auth|token|me|[a-z0-9-]+s|\\{[a-zA-Z0-9_-]+\\}))*$"
+        match: "^\\/(v[0-9]+|login|logout|auth|token|me|audit|system|drain|ping|history|raw|derived|logs|health|healthz|readyz|[a-z0-9-]+s|\\{[a-zA-Z0-9_-]+\\})(\\/(login|logout|auth|token|me|audit|system|drain|ping|history|raw|derived|logs|health|healthz|readyz|[a-z0-9-]+s|\\{[a-zA-Z0-9_-]+\\}))*$"
 
   # 2. Pathはkebab-case
   paths-kebab-case:

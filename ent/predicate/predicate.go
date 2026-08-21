@@ -6,5 +6,29 @@ import (
 	"entgo.io/ent/dialect/sql"
 )
 
+// AuditLog is the predicate function for auditlog builders.
+type AuditLog func(*sql.Selector)
+
+// CredentialProfile is the predicate function for credentialprofile builders.
+type CredentialProfile func(*sql.Selector)
+
+// Job is the predicate function for job builders.
+type Job func(*sql.Selector)
+
+// JobStep is the predicate function for jobstep builders.
+type JobStep func(*sql.Selector)
+
+// Scenario is the predicate function for scenario builders.
+type Scenario func(*sql.Selector)
+
+// ScenarioVersion is the predicate function for scenarioversion builders.
+type ScenarioVersion func(*sql.Selector)
+
+// StateTransitionLog is the predicate function for statetransitionlog builders.
+type StateTransitionLog func(*sql.Selector)
+
+// Target is the predicate function for target builders.
+type Target func(*sql.Selector)
+
 // User is the predicate function for user builders.
 type User func(*sql.Selector)

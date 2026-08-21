@@ -3,7 +3,17 @@
 package ent
 
 import (
+	"time"
+
+	"github.com/shjtmy/go_sh0jitmy_template/ent/auditlog"
+	"github.com/shjtmy/go_sh0jitmy_template/ent/credentialprofile"
+	"github.com/shjtmy/go_sh0jitmy_template/ent/job"
+	"github.com/shjtmy/go_sh0jitmy_template/ent/jobstep"
+	"github.com/shjtmy/go_sh0jitmy_template/ent/scenario"
+	"github.com/shjtmy/go_sh0jitmy_template/ent/scenarioversion"
 	"github.com/shjtmy/go_sh0jitmy_template/ent/schema"
+	"github.com/shjtmy/go_sh0jitmy_template/ent/statetransitionlog"
+	"github.com/shjtmy/go_sh0jitmy_template/ent/target"
 	"github.com/shjtmy/go_sh0jitmy_template/ent/user"
 )
 
@@ -11,6 +21,272 @@ import (
 // (default values, validators, hooks and policies) and stitches it
 // to their package variables.
 func init() {
+	auditlogFields := schema.AuditLog{}.Fields()
+	_ = auditlogFields
+	// auditlogDescAction is the schema descriptor for action field.
+	auditlogDescAction := auditlogFields[1].Descriptor()
+	// auditlog.ActionValidator is a validator for the "action" field. It is called by the builders before save.
+	auditlog.ActionValidator = auditlogDescAction.Validators[0].(func(string) error)
+	// auditlogDescUserID is the schema descriptor for user_id field.
+	auditlogDescUserID := auditlogFields[2].Descriptor()
+	// auditlog.DefaultUserID holds the default value on creation for the user_id field.
+	auditlog.DefaultUserID = auditlogDescUserID.Default.(string)
+	// auditlogDescRole is the schema descriptor for role field.
+	auditlogDescRole := auditlogFields[3].Descriptor()
+	// auditlog.DefaultRole holds the default value on creation for the role field.
+	auditlog.DefaultRole = auditlogDescRole.Default.(string)
+	// auditlogDescIP is the schema descriptor for ip field.
+	auditlogDescIP := auditlogFields[4].Descriptor()
+	// auditlog.DefaultIP holds the default value on creation for the ip field.
+	auditlog.DefaultIP = auditlogDescIP.Default.(string)
+	// auditlogDescTargetID is the schema descriptor for target_id field.
+	auditlogDescTargetID := auditlogFields[5].Descriptor()
+	// auditlog.DefaultTargetID holds the default value on creation for the target_id field.
+	auditlog.DefaultTargetID = auditlogDescTargetID.Default.(string)
+	// auditlogDescScenarioID is the schema descriptor for scenario_id field.
+	auditlogDescScenarioID := auditlogFields[6].Descriptor()
+	// auditlog.DefaultScenarioID holds the default value on creation for the scenario_id field.
+	auditlog.DefaultScenarioID = auditlogDescScenarioID.Default.(string)
+	// auditlogDescCreatedAt is the schema descriptor for created_at field.
+	auditlogDescCreatedAt := auditlogFields[8].Descriptor()
+	// auditlog.DefaultCreatedAt holds the default value on creation for the created_at field.
+	auditlog.DefaultCreatedAt = auditlogDescCreatedAt.Default.(func() time.Time)
+	// auditlogDescID is the schema descriptor for id field.
+	auditlogDescID := auditlogFields[0].Descriptor()
+	// auditlog.IDValidator is a validator for the "id" field. It is called by the builders before save.
+	auditlog.IDValidator = auditlogDescID.Validators[0].(func(string) error)
+	credentialprofileFields := schema.CredentialProfile{}.Fields()
+	_ = credentialprofileFields
+	// credentialprofileDescName is the schema descriptor for name field.
+	credentialprofileDescName := credentialprofileFields[1].Descriptor()
+	// credentialprofile.NameValidator is a validator for the "name" field. It is called by the builders before save.
+	credentialprofile.NameValidator = credentialprofileDescName.Validators[0].(func(string) error)
+	// credentialprofileDescVersion is the schema descriptor for version field.
+	credentialprofileDescVersion := credentialprofileFields[2].Descriptor()
+	// credentialprofile.DefaultVersion holds the default value on creation for the version field.
+	credentialprofile.DefaultVersion = credentialprofileDescVersion.Default.(string)
+	// credentialprofileDescSecLevel is the schema descriptor for sec_level field.
+	credentialprofileDescSecLevel := credentialprofileFields[3].Descriptor()
+	// credentialprofile.DefaultSecLevel holds the default value on creation for the sec_level field.
+	credentialprofile.DefaultSecLevel = credentialprofileDescSecLevel.Default.(string)
+	// credentialprofileDescCommunity is the schema descriptor for community field.
+	credentialprofileDescCommunity := credentialprofileFields[4].Descriptor()
+	// credentialprofile.DefaultCommunity holds the default value on creation for the community field.
+	credentialprofile.DefaultCommunity = credentialprofileDescCommunity.Default.(string)
+	// credentialprofileDescUsername is the schema descriptor for username field.
+	credentialprofileDescUsername := credentialprofileFields[5].Descriptor()
+	// credentialprofile.DefaultUsername holds the default value on creation for the username field.
+	credentialprofile.DefaultUsername = credentialprofileDescUsername.Default.(string)
+	// credentialprofileDescAuthProtocol is the schema descriptor for auth_protocol field.
+	credentialprofileDescAuthProtocol := credentialprofileFields[6].Descriptor()
+	// credentialprofile.DefaultAuthProtocol holds the default value on creation for the auth_protocol field.
+	credentialprofile.DefaultAuthProtocol = credentialprofileDescAuthProtocol.Default.(string)
+	// credentialprofileDescAuthPassphrase is the schema descriptor for auth_passphrase field.
+	credentialprofileDescAuthPassphrase := credentialprofileFields[7].Descriptor()
+	// credentialprofile.DefaultAuthPassphrase holds the default value on creation for the auth_passphrase field.
+	credentialprofile.DefaultAuthPassphrase = credentialprofileDescAuthPassphrase.Default.(string)
+	// credentialprofileDescPrivProtocol is the schema descriptor for priv_protocol field.
+	credentialprofileDescPrivProtocol := credentialprofileFields[8].Descriptor()
+	// credentialprofile.DefaultPrivProtocol holds the default value on creation for the priv_protocol field.
+	credentialprofile.DefaultPrivProtocol = credentialprofileDescPrivProtocol.Default.(string)
+	// credentialprofileDescPrivPassphrase is the schema descriptor for priv_passphrase field.
+	credentialprofileDescPrivPassphrase := credentialprofileFields[9].Descriptor()
+	// credentialprofile.DefaultPrivPassphrase holds the default value on creation for the priv_passphrase field.
+	credentialprofile.DefaultPrivPassphrase = credentialprofileDescPrivPassphrase.Default.(string)
+	// credentialprofileDescCreatedAt is the schema descriptor for created_at field.
+	credentialprofileDescCreatedAt := credentialprofileFields[10].Descriptor()
+	// credentialprofile.DefaultCreatedAt holds the default value on creation for the created_at field.
+	credentialprofile.DefaultCreatedAt = credentialprofileDescCreatedAt.Default.(func() time.Time)
+	// credentialprofileDescUpdatedAt is the schema descriptor for updated_at field.
+	credentialprofileDescUpdatedAt := credentialprofileFields[11].Descriptor()
+	// credentialprofile.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	credentialprofile.DefaultUpdatedAt = credentialprofileDescUpdatedAt.Default.(func() time.Time)
+	// credentialprofile.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	credentialprofile.UpdateDefaultUpdatedAt = credentialprofileDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// credentialprofileDescID is the schema descriptor for id field.
+	credentialprofileDescID := credentialprofileFields[0].Descriptor()
+	// credentialprofile.IDValidator is a validator for the "id" field. It is called by the builders before save.
+	credentialprofile.IDValidator = credentialprofileDescID.Validators[0].(func(string) error)
+	jobFields := schema.Job{}.Fields()
+	_ = jobFields
+	// jobDescScenarioID is the schema descriptor for scenario_id field.
+	jobDescScenarioID := jobFields[1].Descriptor()
+	// job.ScenarioIDValidator is a validator for the "scenario_id" field. It is called by the builders before save.
+	job.ScenarioIDValidator = jobDescScenarioID.Validators[0].(func(string) error)
+	// jobDescScenarioVersion is the schema descriptor for scenario_version field.
+	jobDescScenarioVersion := jobFields[2].Descriptor()
+	// job.DefaultScenarioVersion holds the default value on creation for the scenario_version field.
+	job.DefaultScenarioVersion = jobDescScenarioVersion.Default.(int)
+	// jobDescStatus is the schema descriptor for status field.
+	jobDescStatus := jobFields[3].Descriptor()
+	// job.DefaultStatus holds the default value on creation for the status field.
+	job.DefaultStatus = jobDescStatus.Default.(string)
+	// jobDescTriggeredBy is the schema descriptor for triggered_by field.
+	jobDescTriggeredBy := jobFields[6].Descriptor()
+	// job.DefaultTriggeredBy holds the default value on creation for the triggered_by field.
+	job.DefaultTriggeredBy = jobDescTriggeredBy.Default.(string)
+	// jobDescCreatedAt is the schema descriptor for created_at field.
+	jobDescCreatedAt := jobFields[9].Descriptor()
+	// job.DefaultCreatedAt holds the default value on creation for the created_at field.
+	job.DefaultCreatedAt = jobDescCreatedAt.Default.(func() time.Time)
+	// jobDescID is the schema descriptor for id field.
+	jobDescID := jobFields[0].Descriptor()
+	// job.IDValidator is a validator for the "id" field. It is called by the builders before save.
+	job.IDValidator = jobDescID.Validators[0].(func(string) error)
+	jobstepFields := schema.JobStep{}.Fields()
+	_ = jobstepFields
+	// jobstepDescJobID is the schema descriptor for job_id field.
+	jobstepDescJobID := jobstepFields[1].Descriptor()
+	// jobstep.JobIDValidator is a validator for the "job_id" field. It is called by the builders before save.
+	jobstep.JobIDValidator = jobstepDescJobID.Validators[0].(func(string) error)
+	// jobstepDescStepID is the schema descriptor for step_id field.
+	jobstepDescStepID := jobstepFields[2].Descriptor()
+	// jobstep.StepIDValidator is a validator for the "step_id" field. It is called by the builders before save.
+	jobstep.StepIDValidator = jobstepDescStepID.Validators[0].(func(string) error)
+	// jobstepDescStepOrder is the schema descriptor for step_order field.
+	jobstepDescStepOrder := jobstepFields[3].Descriptor()
+	// jobstep.DefaultStepOrder holds the default value on creation for the step_order field.
+	jobstep.DefaultStepOrder = jobstepDescStepOrder.Default.(int)
+	// jobstepDescStepType is the schema descriptor for step_type field.
+	jobstepDescStepType := jobstepFields[4].Descriptor()
+	// jobstep.StepTypeValidator is a validator for the "step_type" field. It is called by the builders before save.
+	jobstep.StepTypeValidator = jobstepDescStepType.Validators[0].(func(string) error)
+	// jobstepDescStatus is the schema descriptor for status field.
+	jobstepDescStatus := jobstepFields[5].Descriptor()
+	// jobstep.DefaultStatus holds the default value on creation for the status field.
+	jobstep.DefaultStatus = jobstepDescStatus.Default.(string)
+	// jobstepDescError is the schema descriptor for error field.
+	jobstepDescError := jobstepFields[7].Descriptor()
+	// jobstep.DefaultError holds the default value on creation for the error field.
+	jobstep.DefaultError = jobstepDescError.Default.(string)
+	// jobstepDescExecutedAt is the schema descriptor for executed_at field.
+	jobstepDescExecutedAt := jobstepFields[8].Descriptor()
+	// jobstep.DefaultExecutedAt holds the default value on creation for the executed_at field.
+	jobstep.DefaultExecutedAt = jobstepDescExecutedAt.Default.(func() time.Time)
+	// jobstepDescID is the schema descriptor for id field.
+	jobstepDescID := jobstepFields[0].Descriptor()
+	// jobstep.IDValidator is a validator for the "id" field. It is called by the builders before save.
+	jobstep.IDValidator = jobstepDescID.Validators[0].(func(string) error)
+	scenarioFields := schema.Scenario{}.Fields()
+	_ = scenarioFields
+	// scenarioDescName is the schema descriptor for name field.
+	scenarioDescName := scenarioFields[1].Descriptor()
+	// scenario.NameValidator is a validator for the "name" field. It is called by the builders before save.
+	scenario.NameValidator = scenarioDescName.Validators[0].(func(string) error)
+	// scenarioDescDescription is the schema descriptor for description field.
+	scenarioDescDescription := scenarioFields[2].Descriptor()
+	// scenario.DefaultDescription holds the default value on creation for the description field.
+	scenario.DefaultDescription = scenarioDescDescription.Default.(string)
+	// scenarioDescCurrentVersion is the schema descriptor for current_version field.
+	scenarioDescCurrentVersion := scenarioFields[3].Descriptor()
+	// scenario.DefaultCurrentVersion holds the default value on creation for the current_version field.
+	scenario.DefaultCurrentVersion = scenarioDescCurrentVersion.Default.(int)
+	// scenarioDescCreatedAt is the schema descriptor for created_at field.
+	scenarioDescCreatedAt := scenarioFields[4].Descriptor()
+	// scenario.DefaultCreatedAt holds the default value on creation for the created_at field.
+	scenario.DefaultCreatedAt = scenarioDescCreatedAt.Default.(func() time.Time)
+	// scenarioDescUpdatedAt is the schema descriptor for updated_at field.
+	scenarioDescUpdatedAt := scenarioFields[5].Descriptor()
+	// scenario.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	scenario.DefaultUpdatedAt = scenarioDescUpdatedAt.Default.(func() time.Time)
+	// scenario.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	scenario.UpdateDefaultUpdatedAt = scenarioDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// scenarioDescID is the schema descriptor for id field.
+	scenarioDescID := scenarioFields[0].Descriptor()
+	// scenario.IDValidator is a validator for the "id" field. It is called by the builders before save.
+	scenario.IDValidator = scenarioDescID.Validators[0].(func(string) error)
+	scenarioversionFields := schema.ScenarioVersion{}.Fields()
+	_ = scenarioversionFields
+	// scenarioversionDescScenarioID is the schema descriptor for scenario_id field.
+	scenarioversionDescScenarioID := scenarioversionFields[1].Descriptor()
+	// scenarioversion.ScenarioIDValidator is a validator for the "scenario_id" field. It is called by the builders before save.
+	scenarioversion.ScenarioIDValidator = scenarioversionDescScenarioID.Validators[0].(func(string) error)
+	// scenarioversionDescVersion is the schema descriptor for version field.
+	scenarioversionDescVersion := scenarioversionFields[2].Descriptor()
+	// scenarioversion.DefaultVersion holds the default value on creation for the version field.
+	scenarioversion.DefaultVersion = scenarioversionDescVersion.Default.(int)
+	// scenarioversionDescDslYaml is the schema descriptor for dsl_yaml field.
+	scenarioversionDescDslYaml := scenarioversionFields[3].Descriptor()
+	// scenarioversion.DslYamlValidator is a validator for the "dsl_yaml" field. It is called by the builders before save.
+	scenarioversion.DslYamlValidator = scenarioversionDescDslYaml.Validators[0].(func(string) error)
+	// scenarioversionDescCreatedAt is the schema descriptor for created_at field.
+	scenarioversionDescCreatedAt := scenarioversionFields[6].Descriptor()
+	// scenarioversion.DefaultCreatedAt holds the default value on creation for the created_at field.
+	scenarioversion.DefaultCreatedAt = scenarioversionDescCreatedAt.Default.(func() time.Time)
+	// scenarioversionDescID is the schema descriptor for id field.
+	scenarioversionDescID := scenarioversionFields[0].Descriptor()
+	// scenarioversion.IDValidator is a validator for the "id" field. It is called by the builders before save.
+	scenarioversion.IDValidator = scenarioversionDescID.Validators[0].(func(string) error)
+	statetransitionlogFields := schema.StateTransitionLog{}.Fields()
+	_ = statetransitionlogFields
+	// statetransitionlogDescTarget is the schema descriptor for target field.
+	statetransitionlogDescTarget := statetransitionlogFields[1].Descriptor()
+	// statetransitionlog.TargetValidator is a validator for the "target" field. It is called by the builders before save.
+	statetransitionlog.TargetValidator = statetransitionlogDescTarget.Validators[0].(func(string) error)
+	// statetransitionlogDescStateKey is the schema descriptor for state_key field.
+	statetransitionlogDescStateKey := statetransitionlogFields[2].Descriptor()
+	// statetransitionlog.StateKeyValidator is a validator for the "state_key" field. It is called by the builders before save.
+	statetransitionlog.StateKeyValidator = statetransitionlogDescStateKey.Validators[0].(func(string) error)
+	// statetransitionlogDescOldValue is the schema descriptor for old_value field.
+	statetransitionlogDescOldValue := statetransitionlogFields[3].Descriptor()
+	// statetransitionlog.DefaultOldValue holds the default value on creation for the old_value field.
+	statetransitionlog.DefaultOldValue = statetransitionlogDescOldValue.Default.(string)
+	// statetransitionlogDescNewValue is the schema descriptor for new_value field.
+	statetransitionlogDescNewValue := statetransitionlogFields[4].Descriptor()
+	// statetransitionlog.DefaultNewValue holds the default value on creation for the new_value field.
+	statetransitionlog.DefaultNewValue = statetransitionlogDescNewValue.Default.(string)
+	// statetransitionlogDescTrigger is the schema descriptor for trigger field.
+	statetransitionlogDescTrigger := statetransitionlogFields[5].Descriptor()
+	// statetransitionlog.TriggerValidator is a validator for the "trigger" field. It is called by the builders before save.
+	statetransitionlog.TriggerValidator = statetransitionlogDescTrigger.Validators[0].(func(string) error)
+	// statetransitionlogDescCreatedAt is the schema descriptor for created_at field.
+	statetransitionlogDescCreatedAt := statetransitionlogFields[6].Descriptor()
+	// statetransitionlog.DefaultCreatedAt holds the default value on creation for the created_at field.
+	statetransitionlog.DefaultCreatedAt = statetransitionlogDescCreatedAt.Default.(func() time.Time)
+	// statetransitionlogDescID is the schema descriptor for id field.
+	statetransitionlogDescID := statetransitionlogFields[0].Descriptor()
+	// statetransitionlog.IDValidator is a validator for the "id" field. It is called by the builders before save.
+	statetransitionlog.IDValidator = statetransitionlogDescID.Validators[0].(func(string) error)
+	targetFields := schema.Target{}.Fields()
+	_ = targetFields
+	// targetDescName is the schema descriptor for name field.
+	targetDescName := targetFields[1].Descriptor()
+	// target.NameValidator is a validator for the "name" field. It is called by the builders before save.
+	target.NameValidator = targetDescName.Validators[0].(func(string) error)
+	// targetDescDescription is the schema descriptor for description field.
+	targetDescDescription := targetFields[2].Descriptor()
+	// target.DefaultDescription holds the default value on creation for the description field.
+	target.DefaultDescription = targetDescDescription.Default.(string)
+	// targetDescHost is the schema descriptor for host field.
+	targetDescHost := targetFields[3].Descriptor()
+	// target.HostValidator is a validator for the "host" field. It is called by the builders before save.
+	target.HostValidator = targetDescHost.Validators[0].(func(string) error)
+	// targetDescPort is the schema descriptor for port field.
+	targetDescPort := targetFields[4].Descriptor()
+	// target.DefaultPort holds the default value on creation for the port field.
+	target.DefaultPort = targetDescPort.Default.(int)
+	// targetDescStatus is the schema descriptor for status field.
+	targetDescStatus := targetFields[5].Descriptor()
+	// target.DefaultStatus holds the default value on creation for the status field.
+	target.DefaultStatus = targetDescStatus.Default.(string)
+	// targetDescCredentialID is the schema descriptor for credential_id field.
+	targetDescCredentialID := targetFields[7].Descriptor()
+	// target.CredentialIDValidator is a validator for the "credential_id" field. It is called by the builders before save.
+	target.CredentialIDValidator = targetDescCredentialID.Validators[0].(func(string) error)
+	// targetDescCreatedAt is the schema descriptor for created_at field.
+	targetDescCreatedAt := targetFields[9].Descriptor()
+	// target.DefaultCreatedAt holds the default value on creation for the created_at field.
+	target.DefaultCreatedAt = targetDescCreatedAt.Default.(func() time.Time)
+	// targetDescUpdatedAt is the schema descriptor for updated_at field.
+	targetDescUpdatedAt := targetFields[10].Descriptor()
+	// target.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	target.DefaultUpdatedAt = targetDescUpdatedAt.Default.(func() time.Time)
+	// target.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	target.UpdateDefaultUpdatedAt = targetDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// targetDescID is the schema descriptor for id field.
+	targetDescID := targetFields[0].Descriptor()
+	// target.IDValidator is a validator for the "id" field. It is called by the builders before save.
+	target.IDValidator = targetDescID.Validators[0].(func(string) error)
 	userFields := schema.User{}.Fields()
 	_ = userFields
 	// userDescUsername is the schema descriptor for username field.

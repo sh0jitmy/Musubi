@@ -8,6 +8,225 @@ import (
 )
 
 var (
+	// AuditLogsColumns holds the columns for the "audit_logs" table.
+	AuditLogsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString, Unique: true},
+		{Name: "action", Type: field.TypeString},
+		{Name: "user_id", Type: field.TypeString, Default: "system"},
+		{Name: "role", Type: field.TypeString, Default: "system"},
+		{Name: "ip", Type: field.TypeString, Default: "127.0.0.1"},
+		{Name: "target_id", Type: field.TypeString, Nullable: true, Default: ""},
+		{Name: "scenario_id", Type: field.TypeString, Nullable: true, Default: ""},
+		{Name: "diff", Type: field.TypeJSON, Nullable: true},
+		{Name: "created_at", Type: field.TypeTime},
+	}
+	// AuditLogsTable holds the schema information for the "audit_logs" table.
+	AuditLogsTable = &schema.Table{
+		Name:       "audit_logs",
+		Columns:    AuditLogsColumns,
+		PrimaryKey: []*schema.Column{AuditLogsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "auditlog_action_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{AuditLogsColumns[1], AuditLogsColumns[8]},
+			},
+			{
+				Name:    "auditlog_user_id",
+				Unique:  false,
+				Columns: []*schema.Column{AuditLogsColumns[2]},
+			},
+		},
+	}
+	// CredentialProfilesColumns holds the columns for the "credential_profiles" table.
+	CredentialProfilesColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString, Unique: true},
+		{Name: "name", Type: field.TypeString, Unique: true},
+		{Name: "version", Type: field.TypeString, Default: "v2c"},
+		{Name: "sec_level", Type: field.TypeString, Default: "noAuthNoPriv"},
+		{Name: "community", Type: field.TypeString, Nullable: true, Default: ""},
+		{Name: "username", Type: field.TypeString, Nullable: true, Default: ""},
+		{Name: "auth_protocol", Type: field.TypeString, Nullable: true, Default: ""},
+		{Name: "auth_passphrase", Type: field.TypeString, Nullable: true, Default: ""},
+		{Name: "priv_protocol", Type: field.TypeString, Nullable: true, Default: ""},
+		{Name: "priv_passphrase", Type: field.TypeString, Nullable: true, Default: ""},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+	}
+	// CredentialProfilesTable holds the schema information for the "credential_profiles" table.
+	CredentialProfilesTable = &schema.Table{
+		Name:       "credential_profiles",
+		Columns:    CredentialProfilesColumns,
+		PrimaryKey: []*schema.Column{CredentialProfilesColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "credentialprofile_name",
+				Unique:  true,
+				Columns: []*schema.Column{CredentialProfilesColumns[1]},
+			},
+		},
+	}
+	// JobsColumns holds the columns for the "jobs" table.
+	JobsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString, Unique: true},
+		{Name: "scenario_id", Type: field.TypeString},
+		{Name: "scenario_version", Type: field.TypeInt, Default: 1},
+		{Name: "status", Type: field.TypeString, Default: "QUEUED"},
+		{Name: "dynamic_inputs", Type: field.TypeJSON, Nullable: true},
+		{Name: "locked_targets", Type: field.TypeJSON, Nullable: true},
+		{Name: "triggered_by", Type: field.TypeString, Nullable: true, Default: "admin"},
+		{Name: "started_at", Type: field.TypeTime, Nullable: true},
+		{Name: "finished_at", Type: field.TypeTime, Nullable: true},
+		{Name: "created_at", Type: field.TypeTime},
+	}
+	// JobsTable holds the schema information for the "jobs" table.
+	JobsTable = &schema.Table{
+		Name:       "jobs",
+		Columns:    JobsColumns,
+		PrimaryKey: []*schema.Column{JobsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "job_scenario_id",
+				Unique:  false,
+				Columns: []*schema.Column{JobsColumns[1]},
+			},
+			{
+				Name:    "job_status",
+				Unique:  false,
+				Columns: []*schema.Column{JobsColumns[3]},
+			},
+		},
+	}
+	// JobStepsColumns holds the columns for the "job_steps" table.
+	JobStepsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString, Unique: true},
+		{Name: "job_id", Type: field.TypeString},
+		{Name: "step_id", Type: field.TypeString},
+		{Name: "step_order", Type: field.TypeInt, Default: 0},
+		{Name: "step_type", Type: field.TypeString},
+		{Name: "status", Type: field.TypeString, Default: "PENDING"},
+		{Name: "result_output", Type: field.TypeJSON, Nullable: true},
+		{Name: "error", Type: field.TypeString, Nullable: true, Default: ""},
+		{Name: "executed_at", Type: field.TypeTime},
+	}
+	// JobStepsTable holds the schema information for the "job_steps" table.
+	JobStepsTable = &schema.Table{
+		Name:       "job_steps",
+		Columns:    JobStepsColumns,
+		PrimaryKey: []*schema.Column{JobStepsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "jobstep_job_id_step_order",
+				Unique:  false,
+				Columns: []*schema.Column{JobStepsColumns[1], JobStepsColumns[3]},
+			},
+		},
+	}
+	// ScenariosColumns holds the columns for the "scenarios" table.
+	ScenariosColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString, Unique: true},
+		{Name: "name", Type: field.TypeString, Unique: true},
+		{Name: "description", Type: field.TypeString, Nullable: true, Default: ""},
+		{Name: "current_version", Type: field.TypeInt, Default: 1},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+	}
+	// ScenariosTable holds the schema information for the "scenarios" table.
+	ScenariosTable = &schema.Table{
+		Name:       "scenarios",
+		Columns:    ScenariosColumns,
+		PrimaryKey: []*schema.Column{ScenariosColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "scenario_name",
+				Unique:  true,
+				Columns: []*schema.Column{ScenariosColumns[1]},
+			},
+		},
+	}
+	// ScenarioVersionsColumns holds the columns for the "scenario_versions" table.
+	ScenarioVersionsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString, Unique: true},
+		{Name: "scenario_id", Type: field.TypeString},
+		{Name: "version", Type: field.TypeInt, Default: 1},
+		{Name: "dsl_yaml", Type: field.TypeString, Size: 2147483647},
+		{Name: "inputs_schema", Type: field.TypeJSON, Nullable: true},
+		{Name: "target_names", Type: field.TypeJSON, Nullable: true},
+		{Name: "created_at", Type: field.TypeTime},
+	}
+	// ScenarioVersionsTable holds the schema information for the "scenario_versions" table.
+	ScenarioVersionsTable = &schema.Table{
+		Name:       "scenario_versions",
+		Columns:    ScenarioVersionsColumns,
+		PrimaryKey: []*schema.Column{ScenarioVersionsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "scenarioversion_scenario_id_version",
+				Unique:  true,
+				Columns: []*schema.Column{ScenarioVersionsColumns[1], ScenarioVersionsColumns[2]},
+			},
+		},
+	}
+	// StateTransitionLogsColumns holds the columns for the "state_transition_logs" table.
+	StateTransitionLogsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString, Unique: true},
+		{Name: "target", Type: field.TypeString},
+		{Name: "state_key", Type: field.TypeString},
+		{Name: "old_value", Type: field.TypeString, Default: ""},
+		{Name: "new_value", Type: field.TypeString, Default: ""},
+		{Name: "trigger", Type: field.TypeString},
+		{Name: "created_at", Type: field.TypeTime},
+	}
+	// StateTransitionLogsTable holds the schema information for the "state_transition_logs" table.
+	StateTransitionLogsTable = &schema.Table{
+		Name:       "state_transition_logs",
+		Columns:    StateTransitionLogsColumns,
+		PrimaryKey: []*schema.Column{StateTransitionLogsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "statetransitionlog_target_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{StateTransitionLogsColumns[1], StateTransitionLogsColumns[6]},
+			},
+			{
+				Name:    "statetransitionlog_state_key",
+				Unique:  false,
+				Columns: []*schema.Column{StateTransitionLogsColumns[2]},
+			},
+		},
+	}
+	// TargetsColumns holds the columns for the "targets" table.
+	TargetsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString, Unique: true},
+		{Name: "name", Type: field.TypeString, Unique: true},
+		{Name: "description", Type: field.TypeString, Nullable: true, Default: ""},
+		{Name: "host", Type: field.TypeString},
+		{Name: "port", Type: field.TypeInt, Default: 161},
+		{Name: "status", Type: field.TypeString, Default: "ONLINE"},
+		{Name: "labels", Type: field.TypeJSON, Nullable: true},
+		{Name: "credential_id", Type: field.TypeString},
+		{Name: "polling_config", Type: field.TypeJSON, Nullable: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+	}
+	// TargetsTable holds the schema information for the "targets" table.
+	TargetsTable = &schema.Table{
+		Name:       "targets",
+		Columns:    TargetsColumns,
+		PrimaryKey: []*schema.Column{TargetsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "target_name",
+				Unique:  true,
+				Columns: []*schema.Column{TargetsColumns[1]},
+			},
+			{
+				Name:    "target_status",
+				Unique:  false,
+				Columns: []*schema.Column{TargetsColumns[5]},
+			},
+		},
+	}
 	// UsersColumns holds the columns for the "users" table.
 	UsersColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -29,6 +248,14 @@ var (
 	}
 	// Tables holds all the tables in the schema.
 	Tables = []*schema.Table{
+		AuditLogsTable,
+		CredentialProfilesTable,
+		JobsTable,
+		JobStepsTable,
+		ScenariosTable,
+		ScenarioVersionsTable,
+		StateTransitionLogsTable,
+		TargetsTable,
 		UsersTable,
 	}
 )

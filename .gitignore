@@ -32,3 +32,9 @@ bin/
 
 # Go toolchain download
 .go/
+
+# Test artifacts & reports
+test_reports/
+*.png
+coverage.html
+

@@ -1,29 +1,47 @@
 openapi: 3.0.3
 info:
-  title: Secure Go Template API
-  description: A secure and production-ready HTTP API server demonstrating slog masking, Bearer auth, and ent SQLite database.
+  title: Musubi API
+  description: High-Performance Network Scenario & SNMP Orchestration Engine with DDD Layered Architecture.
   version: 1.0.0
   contact:
-    name: API Support
-    email: support@example.com
+    name: Musubi Core Team
 servers:
-  - url: http://localhost:8080/v1
-    description: Local development server
+  - url: http://localhost:8080
+    description: Local / Air-Gapped Single Binary Server
+
 tags:
   - name: Authentication
-    description: Authentication related endpoints.
-  - name: Users
-    description: User related endpoints.
+    description: Local JWT Authentication & RBAC Session Management
+  - name: Targets
+    description: Network Target Inventory, Ping Probe, Drain & History Management
+  - name: Credentials
+    description: SNMP v1/v2c Community & v3 USM Credential Profiles
+  - name: Scenarios
+    description: YAML Scenario DSL, Versioning, GitOps Import/Export & Orphan Cleanup
+  - name: Jobs
+    description: Scenario Job Execution, Real-time Step Progress & Cancel
+  - name: States
+    description: 2-Tier Raw/Derived State & State Transition Diff Timeline
+  - name: Events
+    description: Real-time Server-Sent Events (SSE) & Long Polling Fallback
+  - name: Mibs
+    description: MIB Registry & OID Tree Lookups
+  - name: Audit
+    description: Tamper-Evident Audit Export, Full Backup/Restore & Health Checks
+
 paths:
-  /v1/login:
+  # ==========================================
+  # Authentication
+  # ==========================================
+  /v1/auth/login:
     post:
-      summary: User login
-      description: Authenticate a user with username and password, returning a JWT token.
+      summary: User Login
+      description: Authenticate locally via bcrypt and issue offline JWT token.
       operationId: login
       tags:
         - Authentication
       requestBody:
-        description: User credentials for authentication
+        description: User login credentials
         required: true
         content:
           application/json:
@@ -31,17 +49,11 @@ paths:
               $ref: '#/components/schemas/LoginRequest'
       responses:
         '200':
-          description: Successfully authenticated
+          description: Login successful
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/LoginResponse'
-        '400':
-          description: Invalid request payload
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
         '401':
           description: Authentication failed
           content:
@@ -49,22 +61,22 @@ paths:
               schema:
                 $ref: '#/components/schemas/ProblemDetails'
 
-  /v1/users/me:
+  /v1/auth/me:
     get:
-      summary: Get current authenticated user
-      description: Retrieve profile information for the currently authenticated user session.
+      summary: Get Current User Session
+      description: Retrieve current user profile and Casbin RBAC roles.
       operationId: getMe
       tags:
-        - Users
+        - Authentication
       security:
         - BearerAuth: []
       responses:
         '200':
-          description: User profile
+          description: User profile and permissions
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/User'
+                $ref: '#/components/schemas/UserProfile'
         '401':
           description: Unauthorized
           content:
@@ -72,75 +84,2205 @@ paths:
               schema:
                 $ref: '#/components/schemas/ProblemDetails'
 
+  # ==========================================
+  # Targets
+  # ==========================================
+  /v1/targets:
+    get:
+      summary: List Targets
+      description: Retrieve registered network targets with optional filtering.
+      operationId: listTargets
+      tags:
+        - Targets
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: labels
+          in: query
+          description: Label filter (e.g. role:spine,site:dc1)
+          schema:
+            type: string
+            example: "role:spine"
+        - name: status
+          in: query
+          description: Status filter (ONLINE, OFFLINE, TESTING, DRAINING, MAINTENANCE, DELETED)
+          schema:
+            type: string
+            example: "ONLINE"
+        - name: limit
+          in: query
+          description: Maximum number of targets to return
+          schema:
+            type: integer
+            default: 50
+            example: 50
+        - name: cursor
+          in: query
+          description: Pagination cursor
+          schema:
+            type: string
+            example: "eyJpZCI6MTIzfQ=="
+      responses:
+        '200':
+          description: List of targets
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TargetListResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+
+    post:
+      summary: Register Target
+      description: Register a new network target in inventory.
+      operationId: createTarget
+      tags:
+        - Targets
+      security:
+        - BearerAuth: []
+      requestBody:
+        description: Target creation payload
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTargetRequest'
+      responses:
+        '201':
+          description: Target created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Target'
+        '400':
+          description: Invalid request payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '409':
+          description: Target already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+
+  /v1/targets/{id}:
+    get:
+      summary: Get Target Details
+      description: Retrieve target details and current SNMP reachability status.
+      operationId: getTarget
+      tags:
+        - Targets
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          description: Unique identifier or name of the target
+          required: true
+          schema:
+            type: string
+            example: "spine1"
+      responses:
+        '200':
+          description: Target details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Target'
+        '404':
+          description: Target not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+
+    put:
+      summary: Update Target
+      description: Update target configuration (automatically generates audit diff).
+      operationId: updateTarget
+      tags:
+        - Targets
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          description: Unique identifier or name of the target
+          required: true
+          schema:
+            type: string
+            example: "spine1"
+      requestBody:
+        description: Target update payload
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTargetRequest'
+      responses:
+        '200':
+          description: Target updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Target'
+        '400':
+          description: Invalid payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '404':
+          description: Target not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '409':
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+
+    delete:
+      summary: Delete Target
+      description: Delete target with reference protection, drain mode, or force abort.
+      operationId: deleteTarget
+      tags:
+        - Targets
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          description: Unique identifier or name of the target
+          required: true
+          schema:
+            type: string
+            example: "spine1"
+        - name: force
+          in: query
+          description: Force soft delete even if referenced by scenarios
+          schema:
+            type: boolean
+            default: false
+            example: false
+        - name: force_abort
+          in: query
+          description: Emergency abort running jobs and delete immediately
+          schema:
+            type: boolean
+            default: false
+            example: false
+        - name: cleanup_scenarios
+          in: query
+          description: Cascade cleanup orphan scenarios referencing this target
+          schema:
+            type: boolean
+            default: false
+            example: false
+      responses:
+        '200':
+          description: Target deleted or marked deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeleteTargetResponse'
+        '400':
+          description: Target is referenced by active scenarios
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '409':
+          description: Target is currently locked and running
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+
+  /v1/targets/{id}/drain:
+    post:
+      summary: Graceful Drain Target
+      description: Stop accepting new scenarios for this target and delete after active jobs finish.
+      operationId: drainTarget
+      tags:
+        - Targets
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          description: Target ID or name to drain
+          required: true
+          schema:
+            type: string
+            example: "spine1"
+      responses:
+        '202':
+          description: Target entered DRAINING state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DrainTargetResponse'
+        '404':
+          description: Target not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+
+  /v1/targets/{id}/ping:
+    post:
+      summary: Ping Target SNMP Probe
+      description: Test SNMP reachability and credentials by requesting sysUpTime.
+      operationId: pingTarget
+      tags:
+        - Targets
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          description: Target ID or name to probe
+          required: true
+          schema:
+            type: string
+            example: "spine1"
+      responses:
+        '200':
+          description: Ping probe result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PingResponse'
+        '404':
+          description: Target not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+
+  /v1/targets/{id}/history:
+    get:
+      summary: Get Target Change History
+      description: Retrieve audit timeline of creates, updates, and deletes with field diffs.
+      operationId: getTargetHistory
+      tags:
+        - Targets
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          description: Target ID or name
+          required: true
+          schema:
+            type: string
+            example: "spine1"
+      responses:
+        '200':
+          description: Change history timeline
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TargetHistoryResponse'
+
+  /v1/targets/imports:
+    post:
+      summary: Bulk Import Targets
+      description: Import target inventory from targets.yaml.
+      operationId: importTargets
+      tags:
+        - Targets
+      security:
+        - BearerAuth: []
+      requestBody:
+        description: YAML text content of targets.yaml
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InventoryImportRequest'
+      responses:
+        '200':
+          description: Import result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InventoryImportResponse'
+
+  /v1/targets/exports:
+    get:
+      summary: Bulk Export Targets
+      description: Export all targets and credentials as targets.yaml bundle.
+      operationId: exportTargets
+      tags:
+        - Targets
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: targets.yaml inventory
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InventoryExportResponse'
+
+  # ==========================================
+  # Credentials
+  # ==========================================
+  /v1/credentials:
+    get:
+      summary: List Credentials
+      description: List SNMP credential profiles (passwords masked).
+      operationId: listCredentials
+      tags:
+        - Credentials
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Credential profiles list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CredentialListResponse'
+
+    post:
+      summary: Create Credential Profile
+      description: Register SNMP v1/v2c Community or v3 USM credential profile.
+      operationId: createCredential
+      tags:
+        - Credentials
+      security:
+        - BearerAuth: []
+      requestBody:
+        description: Credential creation payload
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCredentialRequest'
+      responses:
+        '201':
+          description: Credential created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CredentialProfile'
+        '400':
+          description: Invalid parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+
+  # ==========================================
+  # Scenarios
+  # ==========================================
+  /v1/scenarios:
+    get:
+      summary: List Scenarios
+      description: Retrieve scenarios with orphan/broken status badges.
+      operationId: listScenarios
+      tags:
+        - Scenarios
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Scenario list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScenarioListResponse'
+
+    post:
+      summary: Register Scenario
+      description: Register YAML scenario DSL (returns warnings if referenced targets are missing).
+      operationId: createScenario
+      tags:
+        - Scenarios
+      security:
+        - BearerAuth: []
+      requestBody:
+        description: Scenario definition payload
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateScenarioRequest'
+      responses:
+        '201':
+          description: Scenario registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Scenario'
+        '400':
+          description: DSL Syntax error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+
+  /v1/scenarios/{id}:
+    get:
+      summary: Get Scenario Details
+      description: Retrieve scenario definition, inputs schema, and version history.
+      operationId: getScenario
+      tags:
+        - Scenarios
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          description: Scenario identifier
+          required: true
+          schema:
+            type: string
+            example: "spine-linkdown-failover"
+      responses:
+        '200':
+          description: Scenario details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScenarioDetail'
+        '404':
+          description: Scenario not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+
+    put:
+      summary: Update Scenario Definition
+      description: Update YAML DSL and create a new version.
+      operationId: updateScenario
+      tags:
+        - Scenarios
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          description: Scenario identifier
+          required: true
+          schema:
+            type: string
+            example: "spine-linkdown-failover"
+      requestBody:
+        description: Updated YAML DSL payload
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateScenarioRequest'
+      responses:
+        '200':
+          description: Scenario updated to new version
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Scenario'
+
+    delete:
+      summary: Delete Scenario
+      description: Delete scenario definition (blocked if active jobs are running).
+      operationId: deleteScenario
+      tags:
+        - Scenarios
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          description: Scenario identifier
+          required: true
+          schema:
+            type: string
+            example: "spine-linkdown-failover"
+        - name: force_abort
+          in: query
+          description: Abort running jobs before deleting
+          schema:
+            type: boolean
+            default: false
+            example: false
+      responses:
+        '200':
+          description: Scenario deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeleteScenarioResponse'
+        '409':
+          description: Scenario in use
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+
+  /v1/scenarios/orphans:
+    get:
+      summary: List Orphan Scenarios
+      description: Detect scenarios that reference missing or deleted targets.
+      operationId: listOrphanScenarios
+      tags:
+        - Scenarios
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Orphan scenarios list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrphanScenarioListResponse'
+
+  /v1/scenarios/cleanups:
+    post:
+      summary: Batch Cleanup Orphan Scenarios
+      description: Batch purge orphan scenarios with dry-run and backup options.
+      operationId: cleanupOrphanScenarios
+      tags:
+        - Scenarios
+      security:
+        - BearerAuth: []
+      requestBody:
+        description: Cleanup options
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScenarioCleanupRequest'
+      responses:
+        '200':
+          description: Cleanup result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScenarioCleanupResponse'
+
+  /v1/scenarios/{id}/runs:
+    post:
+      summary: Execute Scenario (Pre-flight & Run)
+      description: Run scenario with dynamic inputs, pre-flight target check, and lease lock.
+      operationId: runScenario
+      tags:
+        - Jobs
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          description: Scenario identifier
+          required: true
+          schema:
+            type: string
+            example: "spine-linkdown-failover"
+        - name: Idempotency-Key
+          in: header
+          description: Unique idempotency key to prevent double runs
+          schema:
+            type: string
+            example: "uuid-12345-67890"
+      requestBody:
+        description: Dynamic execution inputs
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RunJobRequest'
+      responses:
+        '202':
+          description: Scenario execution accepted and started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobExecutionResponse'
+        '400':
+          description: Invalid input parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '409':
+          description: Target lock contention
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '422':
+          description: Pre-flight check failed (target offline/missing)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+
+  # ==========================================
+  # Jobs
+  # ==========================================
+  /v1/jobs/{id}:
+    get:
+      summary: Get Job Execution Status
+      description: Retrieve current progress, step outputs, locked targets, and verdicts.
+      operationId: getJob
+      tags:
+        - Jobs
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          description: Job ID
+          required: true
+          schema:
+            type: string
+            example: "job-001"
+      responses:
+        '200':
+          description: Job status details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobDetail'
+        '404':
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+
+  /v1/jobs/{id}/cancels:
+    post:
+      summary: Cancel / Abort Running Job
+      description: Send context cancel signal to abort active scenario job and release locks.
+      operationId: cancelJob
+      tags:
+        - Jobs
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          description: Job ID
+          required: true
+          schema:
+            type: string
+            example: "job-001"
+      responses:
+        '200':
+          description: Job cancelled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CancelJobResponse'
+
+  # ==========================================
+  # States
+  # ==========================================
+  /v1/states/raw:
+    get:
+      summary: Query Raw State
+      description: Retrieve in-memory SNMP observed raw state tree.
+      operationId: getRawState
+      tags:
+        - States
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: target
+          in: query
+          description: Target name
+          schema:
+            type: string
+            example: "spine1"
+        - name: oid_prefix
+          in: query
+          description: OID prefix filter
+          schema:
+            type: string
+            example: "IF-MIB::"
+      responses:
+        '200':
+          description: Raw state key-values
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RawStateResponse'
+
+  /v1/states/derived:
+    get:
+      summary: Query Derived State
+      description: Retrieve scenario execution context derived states.
+      operationId: getDerivedState
+      tags:
+        - States
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: namespace
+          in: query
+          description: Derived namespace filter
+          schema:
+            type: string
+            example: "bgp"
+      responses:
+        '200':
+          description: Derived state key-values
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DerivedStateResponse'
+
+  /v1/states/transitions:
+    get:
+      summary: Query State Transitions
+      description: Retrieve state transition diff history timeline.
+      operationId: listStateTransitions
+      tags:
+        - States
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: target
+          in: query
+          description: Target name filter
+          schema:
+            type: string
+            example: "spine1"
+        - name: trigger
+          in: query
+          description: Trigger type filter (inform, polling, scenario_step)
+          schema:
+            type: string
+            example: "inform"
+        - name: since
+          in: query
+          description: ISO timestamp filter
+          schema:
+            type: string
+            example: "2026-08-14T00:00:00Z"
+      responses:
+        '200':
+          description: Transition logs list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StateTransitionListResponse'
+
+  /v1/states/transitions/exports:
+    get:
+      summary: Export State Transitions
+      description: Export transition timeline as CSV or JSONL.
+      operationId: exportStateTransitions
+      tags:
+        - States
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: target
+          in: query
+          description: Target filter
+          schema:
+            type: string
+            example: "spine1"
+        - name: format
+          in: query
+          description: Export format (csv or jsonl)
+          schema:
+            type: string
+            enum: [csv, jsonl]
+            default: csv
+            example: "csv"
+      responses:
+        '200':
+          description: Transition timeline file content
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExportFileResponse'
+
+  # ==========================================
+  # Events
+  # ==========================================
+  /v1/events/streams:
+    get:
+      summary: Server-Sent Events (SSE) Stream
+      description: Real-time event streamer for scenario step progress and state changes.
+      operationId: streamEvents
+      tags:
+        - Events
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: topics
+          in: query
+          description: Comma-separated topics
+          schema:
+            type: string
+            example: "job.step_advanced,state.changed"
+      responses:
+        '200':
+          description: SSE event stream
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StreamInfoResponse'
+
+  /v1/events/polls:
+    get:
+      summary: Long Polling Event Fallback
+      description: Long polling fallback endpoint for environments blocking SSE.
+      operationId: pollEvents
+      tags:
+        - Events
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: since_id
+          in: query
+          description: Cursor ID to wait for newer events
+          schema:
+            type: string
+            example: "123"
+        - name: timeout
+          in: query
+          description: Polling timeout
+          schema:
+            type: string
+            default: "30s"
+            example: "30s"
+      responses:
+        '200':
+          description: Events array
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventPollResponse'
+
+  # ==========================================
+  # MIBs
+  # ==========================================
+  /v1/mibs/trees:
+    get:
+      summary: Get MIB Tree & OID Registry
+      description: Retrieve parsed MIB tree for Grafana Infinity plugin or Web UI browsing.
+      operationId: getMibTree
+      tags:
+        - Mibs
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: MIB tree structure
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MibTreeResponse'
+
+  # ==========================================
+  # Audit & Operations
+  # ==========================================
+  /v1/audit/logs:
+    get:
+      summary: Query Audit Logs
+      description: Query operation and API audit trails.
+      operationId: listAuditLogs
+      tags:
+        - Audit
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: from
+          in: query
+          description: Start time filter
+          schema:
+            type: string
+            example: "2026-08-01T00:00:00Z"
+        - name: to
+          in: query
+          description: End time filter
+          schema:
+            type: string
+            example: "2026-08-14T23:59:59Z"
+      responses:
+        '200':
+          description: Audit logs list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditLogListResponse'
+
+  /v1/audit/exports:
+    get:
+      summary: Export Audit Evidence Package
+      description: Export tamper-evident audit bundle (ZIP) containing logs, job results, and SHA256 signature.
+      operationId: exportAuditEvidence
+      tags:
+        - Audit
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: from
+          in: query
+          description: Start time
+          schema:
+            type: string
+            example: "2026-08-01T00:00:00Z"
+        - name: to
+          in: query
+          description: End time
+          schema:
+            type: string
+            example: "2026-08-14T23:59:59Z"
+      responses:
+        '200':
+          description: Audit evidence zip package information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExportFileResponse'
+
+  /v1/system/backups:
+    post:
+      summary: Create System Backup
+      description: Create full backup archive (DB dump, config, MIBs).
+      operationId: createBackup
+      tags:
+        - Audit
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Backup archive information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExportFileResponse'
+
+  /v1/system/restores:
+    post:
+      summary: Apply System Restore
+      description: Restore system data from backup archive within transaction.
+      operationId: restoreBackup
+      tags:
+        - Audit
+      security:
+        - BearerAuth: []
+      requestBody:
+        description: Restore archive payload
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RestoreRequest'
+      responses:
+        '200':
+          description: Restore successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RestoreResponse'
+
+  /v1/system/healthz:
+    get:
+      summary: Liveness Probe
+      description: Process alive check.
+      operationId: healthz
+      tags:
+        - Audit
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthzResponse'
+
+  /v1/system/readyz:
+    get:
+      summary: Readiness Probe
+      description: Dependency health check (PostgreSQL, UDP 162 socket, poller).
+      operationId: readyz
+      tags:
+        - Audit
+      responses:
+        '200':
+          description: Ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadyzResponse'
+        '503':
+          description: Not ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+
+  /v1/system/healths:
+    get:
+      summary: Deep Health Check
+      description: Detailed system diagnostics (DB pool, UDP drops, batch queue length, disk usage).
+      operationId: deepHealth
+      tags:
+        - Audit
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Detailed health metrics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeepHealthResponse'
+
+# ==========================================
+# Components
+# ==========================================
 components:
   securitySchemes:
     BearerAuth:
       type: http
       scheme: bearer
       bearerFormat: JWT
+
   schemas:
     LoginRequest:
+      description: User credentials payload for local login.
       type: object
-      description: The payload containing credentials to log in.
       required:
         - username
         - password
       properties:
         username:
           type: string
-          description: The username of the user.
+          description: Username
           example: admin
         password:
           type: string
-          description: The user password.
-          example: SuperSecretPassword123
+          description: Password
+          example: "AdminSecretPassword123"
+
     LoginResponse:
+      description: Response payload containing JWT token.
       type: object
-      description: The response payload after a successful login.
       required:
         - token
+        - expires_at
       properties:
         token:
           type: string
-          description: JWT token for Bearer authentication.
-          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-    User:
+          description: JWT Access Token
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        expires_at:
+          type: string
+          description: Expiry ISO timestamp
+          example: "2026-08-15T00:00:00Z"
+
+    UserProfile:
+      description: User profile and RBAC roles representation.
       type: object
-      description: Represents a user profile in the system.
       required:
         - id
         - username
+        - roles
       properties:
         id:
-          type: integer
-          description: Unique identifier of the user.
-          example: 42
+          type: string
+          description: User ID
+          example: "usr-admin-01"
         username:
           type: string
-          description: The unique handle of the user.
-          example: john_doe
-    ProblemDetails:
+          description: Username
+          example: "admin"
+        roles:
+          type: array
+          description: Assigned RBAC roles
+          items:
+            type: string
+            example: "Administrator"
+
+    Target:
+      description: Represents a network target device in inventory.
       type: object
-      description: A standard RFC7807 error representation.
+      required:
+        - id
+        - name
+        - host
+        - port
+        - status
+        - credential_id
+      properties:
+        id:
+          type: string
+          description: Unique target ID
+          example: "tgt-spine1-001"
+        name:
+          type: string
+          description: Target unique name
+          example: "spine1"
+        description:
+          type: string
+          description: Target description
+          example: "Core Spine Switch 01"
+        host:
+          type: string
+          description: IP address or hostname
+          example: "192.168.10.1"
+        port:
+          type: integer
+          description: SNMP UDP port
+          default: 161
+          example: 161
+        status:
+          type: string
+          description: Operational status
+          enum: [ONLINE, OFFLINE, TESTING, DRAINING, MAINTENANCE, DELETED]
+          example: "ONLINE"
+        credential_id:
+          type: string
+          description: Linked credential profile ID
+          example: "cred-v3-admin"
+        labels:
+          type: object
+          description: Key-value metadata labels
+          additionalProperties:
+            type: string
+        polling:
+          $ref: '#/components/schemas/TargetPollingConfig'
+        created_at:
+          type: string
+          description: Creation timestamp
+          example: "2026-08-14T10:00:00Z"
+        updated_at:
+          type: string
+          description: Last update timestamp
+          example: "2026-08-14T10:00:00Z"
+
+    TargetPollingConfig:
+      description: Polling configuration profile for target.
+      type: object
+      properties:
+        enabled:
+          type: boolean
+          description: Whether polling is active
+          example: true
+        fast_poll_oids:
+          type: array
+          description: 1s fast poll OID list
+          items:
+            type: string
+            example: "IF-MIB::ifOperStatus.1"
+        bulk_get_mibs:
+          type: array
+          description: 10min bulk get MIB table list
+          items:
+            type: string
+            example: "IF-MIB"
+
+    CreateTargetRequest:
+      description: Request payload for registering a new target.
+      type: object
+      required:
+        - name
+        - host
+        - credential_id
+      properties:
+        name:
+          type: string
+          description: Unique name
+          example: "spine1"
+        description:
+          type: string
+          description: Description
+          example: "Core Spine Switch 01"
+        host:
+          type: string
+          description: IP address or hostname
+          example: "192.168.10.1"
+        port:
+          type: integer
+          description: SNMP port
+          default: 161
+          example: 161
+        credential_id:
+          type: string
+          description: Credential profile ID
+          example: "cred-v3-admin"
+        labels:
+          type: object
+          description: Key-value labels
+          additionalProperties:
+            type: string
+        polling:
+          $ref: '#/components/schemas/TargetPollingConfig'
+
+    UpdateTargetRequest:
+      description: Request payload for updating target configuration.
+      type: object
+      properties:
+        description:
+          type: string
+          description: Description
+          example: "Updated description"
+        host:
+          type: string
+          description: IP address
+          example: "192.168.10.2"
+        port:
+          type: integer
+          description: Port
+          example: 161
+        status:
+          type: string
+          description: Operational status
+          example: "ONLINE"
+        credential_id:
+          type: string
+          description: Credential ID
+          example: "cred-v3-admin"
+        labels:
+          type: object
+          description: Labels
+          additionalProperties:
+            type: string
+        polling:
+          $ref: '#/components/schemas/TargetPollingConfig'
+
+    TargetListResponse:
+      description: Response payload for listing targets.
+      type: object
+      required:
+        - items
+        - total
+      properties:
+        items:
+          type: array
+          description: Array of target objects
+          items:
+            $ref: '#/components/schemas/Target'
+        total:
+          type: integer
+          description: Total count
+          example: 4
+        next_cursor:
+          type: string
+          description: Next page cursor
+          example: "eyJpZCI6NDV9"
+
+    DeleteTargetResponse:
+      description: Response payload after deleting target.
+      type: object
+      required:
+        - id
+        - status
+      properties:
+        id:
+          type: string
+          description: Target ID
+          example: "spine1"
+        status:
+          type: string
+          description: Deletion status
+          example: "DELETED"
+        cleaned_scenarios_count:
+          type: integer
+          description: Number of cascade cleaned orphan scenarios
+          example: 2
+
+    DrainTargetResponse:
+      description: Response payload after initiating target drain.
+      type: object
+      required:
+        - id
+        - status
+        - active_jobs_count
+      properties:
+        id:
+          type: string
+          description: Target ID
+          example: "spine1"
+        status:
+          type: string
+          description: Status
+          example: "DRAINING"
+        active_jobs_count:
+          type: integer
+          description: Number of active jobs draining
+          example: 1
+
+    PingResponse:
+      description: Response payload for target SNMP reachability probe.
+      type: object
+      required:
+        - reachable
+        - rtt_ms
+      properties:
+        reachable:
+          type: boolean
+          description: Whether target responded to SNMP GET
+          example: true
+        rtt_ms:
+          type: number
+          description: Round trip time in milliseconds
+          example: 1.25
+        sys_uptime:
+          type: string
+          description: Observed sysUpTime
+          example: "45 days, 12:30:10"
+        error:
+          type: string
+          description: Error message if unreachable
+          example: ""
+
+    TargetHistoryResponse:
+      description: Response payload containing change audit timeline for a target.
+      type: object
+      required:
+        - target_id
+        - history
+      properties:
+        target_id:
+          type: string
+          description: Target ID
+          example: "spine1"
+        history:
+          type: array
+          description: Change timeline entries
+          items:
+            $ref: '#/components/schemas/ChangeLogEntry'
+
+    ChangeLogEntry:
+      description: Represents a single change log record with before/after diff.
+      type: object
+      required:
+        - id
+        - action
+        - timestamp
+        - actor
+        - diff
+      properties:
+        id:
+          type: string
+          description: Change log ID
+          example: "chg-101"
+        action:
+          type: string
+          description: Action type
+          example: "TARGET_UPDATED"
+        timestamp:
+          type: string
+          description: Timestamp
+          example: "2026-08-14T10:15:30Z"
+        actor:
+          $ref: '#/components/schemas/ActorInfo'
+        diff:
+          type: object
+          description: Field-by-field diff
+          additionalProperties: true
+
+    ActorInfo:
+      description: Information about user performing an action.
+      type: object
+      properties:
+        user_id:
+          type: string
+          description: User ID
+          example: "usr-admin-01"
+        role:
+          type: string
+          description: Role
+          example: "Administrator"
+        ip:
+          type: string
+          description: IP address
+          example: "192.168.1.50"
+
+    CredentialProfile:
+      description: SNMP Credential Profile entity.
+      type: object
+      required:
+        - id
+        - name
+        - version
+      properties:
+        id:
+          type: string
+          description: Credential ID
+          example: "cred-v3-admin"
+        name:
+          type: string
+          description: Profile name
+          example: "v3-prod-admin"
+        version:
+          type: string
+          description: SNMP version
+          enum: [v1, v2c, v3]
+          example: "v3"
+        sec_level:
+          type: string
+          description: USM security level
+          enum: [noAuthNoPriv, authNoPriv, authPriv]
+          example: "authPriv"
+        community:
+          type: string
+          description: Community string (v1/v2c)
+          example: "public"
+        username:
+          type: string
+          description: USM security name (v3)
+          example: "admin"
+        auth_protocol:
+          type: string
+          description: Auth protocol
+          example: "SHA256"
+        priv_protocol:
+          type: string
+          description: Priv protocol
+          example: "AES128"
+
+    CreateCredentialRequest:
+      description: Request payload for registering a credential profile.
+      type: object
+      required:
+        - name
+        - version
+      properties:
+        name:
+          type: string
+          description: Profile name
+          example: "v3-prod-admin"
+        version:
+          type: string
+          description: SNMP version
+          enum: [v1, v2c, v3]
+          example: "v3"
+        sec_level:
+          type: string
+          description: Security level
+          example: "authPriv"
+        community:
+          type: string
+          description: Community string
+          example: "public"
+        username:
+          type: string
+          description: Username
+          example: "admin"
+        auth_protocol:
+          type: string
+          description: Auth protocol
+          example: "SHA256"
+        auth_passphrase:
+          type: string
+          description: Auth password
+          example: "AuthSecretPassphrase"
+        priv_protocol:
+          type: string
+          description: Priv protocol
+          example: "AES128"
+        priv_passphrase:
+          type: string
+          description: Priv password
+          example: "PrivSecretPassphrase"
+
+    CredentialListResponse:
+      description: Response payload for credential list.
+      type: object
+      required:
+        - items
+      properties:
+        items:
+          type: array
+          description: Credential profiles array
+          items:
+            $ref: '#/components/schemas/CredentialProfile'
+
+    Scenario:
+      description: Scenario summary entity.
+      type: object
+      required:
+        - id
+        - name
+        - current_version
+      properties:
+        id:
+          type: string
+          description: Scenario ID
+          example: "spine-linkdown-failover"
+        name:
+          type: string
+          description: Scenario name
+          example: "spine-linkdown-failover"
+        description:
+          type: string
+          description: Description
+          example: "Spine linkdown and failover verification"
+        current_version:
+          type: integer
+          description: Current version
+          example: 1
+        is_orphan:
+          type: boolean
+          description: Whether scenario references missing targets
+          example: false
+        warnings:
+          type: array
+          description: Registration warnings
+          items:
+            type: string
+            example: "Target 'spine1' does not exist in inventory"
+        created_at:
+          type: string
+          description: Created timestamp
+          example: "2026-08-14T10:00:00Z"
+
+    ScenarioDetail:
+      description: Detailed scenario definition with DSL and version history.
+      type: object
+      required:
+        - id
+        - name
+        - current_version
+        - dsl_yaml
+      properties:
+        id:
+          type: string
+          description: Scenario ID
+          example: "spine-linkdown-failover"
+        name:
+          type: string
+          description: Scenario name
+          example: "spine-linkdown-failover"
+        current_version:
+          type: integer
+          description: Current version
+          example: 1
+        dsl_yaml:
+          type: string
+          description: YAML DSL content
+          example: "name: spine-linkdown-failover\nsteps: []"
+        inputs_schema:
+          type: object
+          description: Dynamic inputs schema
+          additionalProperties: true
+        versions:
+          type: array
+          description: Version history
+          items:
+            $ref: '#/components/schemas/ScenarioVersionEntry'
+
+    ScenarioVersionEntry:
+      description: Represents a historical version of a scenario.
+      type: object
+      properties:
+        version:
+          type: integer
+          description: Version number
+          example: 1
+        created_at:
+          type: string
+          description: Version creation timestamp
+          example: "2026-08-14T10:00:00Z"
+
+    CreateScenarioRequest:
+      description: Request payload for registering a new scenario.
+      type: object
+      required:
+        - name
+        - dsl_yaml
+      properties:
+        name:
+          type: string
+          description: Scenario name
+          example: "spine-linkdown-failover"
+        description:
+          type: string
+          description: Description
+          example: "Spine linkdown test"
+        dsl_yaml:
+          type: string
+          description: YAML DSL definition
+          example: "name: spine-linkdown-failover\nsteps: []"
+
+    UpdateScenarioRequest:
+      description: Request payload for updating scenario definition.
+      type: object
+      required:
+        - dsl_yaml
+      properties:
+        dsl_yaml:
+          type: string
+          description: Updated YAML DSL content
+          example: "name: spine-linkdown-failover\nversion: 2\nsteps: []"
+
+    DeleteScenarioResponse:
+      description: Response payload after deleting scenario.
+      type: object
+      required:
+        - id
+        - status
+      properties:
+        id:
+          type: string
+          description: Scenario ID
+          example: "spine-linkdown-failover"
+        status:
+          type: string
+          description: Status
+          example: "DELETED"
+
+    ScenarioListResponse:
+      description: Response payload for listing scenarios.
+      type: object
+      required:
+        - items
+        - total
+      properties:
+        items:
+          type: array
+          description: Scenarios array
+          items:
+            $ref: '#/components/schemas/Scenario'
+        total:
+          type: integer
+          description: Total count
+          example: 12
+
+    OrphanScenarioListResponse:
+      description: Response payload listing orphan scenarios.
+      type: object
+      required:
+        - orphans
+      properties:
+        orphans:
+          type: array
+          description: Array of orphan scenarios
+          items:
+            $ref: '#/components/schemas/OrphanScenarioItem'
+
+    OrphanScenarioItem:
+      description: Details about an orphan scenario.
+      type: object
+      properties:
+        scenario_id:
+          type: string
+          description: Scenario ID
+          example: "spine-linkdown-failover"
+        scenario_name:
+          type: string
+          description: Scenario name
+          example: "spine-linkdown-failover"
+        missing_target_names:
+          type: array
+          description: Missing target names
+          items:
+            type: string
+            example: "spine1"
+
+    ScenarioCleanupRequest:
+      description: Request payload for cleaning up orphan scenarios.
+      type: object
+      properties:
+        dry_run:
+          type: boolean
+          description: If true, only previews cleanup without deleting
+          default: false
+          example: false
+        archive:
+          type: boolean
+          description: If true, exports backup archive before deletion
+          default: true
+          example: true
+        target_id:
+          type: string
+          description: Optional target ID to filter cleanup
+          example: "spine1"
+
+    ScenarioCleanupResponse:
+      description: Response payload after scenario cleanup.
+      type: object
+      required:
+        - deleted_count
+        - deleted_scenarios
+      properties:
+        deleted_count:
+          type: integer
+          description: Number of scenarios cleaned up
+          example: 3
+        deleted_scenarios:
+          type: array
+          description: IDs of deleted scenarios
+          items:
+            type: string
+            example: "spine-linkdown-failover"
+        archive_url:
+          type: string
+          description: Download URL for backup archive
+          example: "/v1/system/backups/archived-scenarios.tar.gz"
+
+    RunJobRequest:
+      description: Dynamic input variables for scenario run.
+      type: object
+      properties:
+        inputs:
+          type: object
+          description: Key-value dynamic inputs
+          additionalProperties: true
+
+    JobExecutionResponse:
+      description: Response payload after accepting scenario execution.
+      type: object
+      required:
+        - job_id
+        - status
+        - stream_url
+      properties:
+        job_id:
+          type: string
+          description: Generated job ID
+          example: "job-spine-001"
+        status:
+          type: string
+          description: Initial status
+          enum: [QUEUED, RUNNING]
+          example: "RUNNING"
+        locked_targets:
+          type: array
+          description: Targets locked by this execution
+          items:
+            type: string
+            example: "spine1"
+        stream_url:
+          type: string
+          description: SSE stream URL to follow progress
+          example: "/v1/events/streams?topics=job.step_advanced"
+
+    JobDetail:
+      description: Full details of job progress, steps, outputs, and verdicts.
+      type: object
+      required:
+        - id
+        - scenario_id
+        - status
+        - steps
+      properties:
+        id:
+          type: string
+          description: Job ID
+          example: "job-spine-001"
+        scenario_id:
+          type: string
+          description: Scenario ID
+          example: "spine-linkdown-failover"
+        status:
+          type: string
+          description: Job status
+          enum: [QUEUED, RUNNING, SUCCESS, FAILED, ABORTED]
+          example: "SUCCESS"
+        dynamic_inputs:
+          type: object
+          description: Applied dynamic inputs
+          additionalProperties: true
+        locked_targets:
+          type: array
+          description: Locked targets
+          items:
+            type: string
+            example: "spine1"
+        steps:
+          type: array
+          description: Executed steps details
+          items:
+            $ref: '#/components/schemas/JobStepDetail'
+        started_at:
+          type: string
+          description: Started timestamp
+          example: "2026-08-14T10:00:00Z"
+        finished_at:
+          type: string
+          description: Finished timestamp
+          example: "2026-08-14T10:00:05Z"
+
+    JobStepDetail:
+      description: Details of a single executed scenario step.
+      type: object
+      required:
+        - step_id
+        - status
+      properties:
+        step_id:
+          type: string
+          description: Step ID
+          example: "step1_down"
+        status:
+          type: string
+          description: Step outcome status
+          enum: [PENDING, RUNNING, SUCCESS, FAILED, SKIPPED]
+          example: "SUCCESS"
+        result_output:
+          type: object
+          description: Step output data
+          additionalProperties: true
+        error:
+          type: string
+          description: Error message if failed
+          example: ""
+        executed_at:
+          type: string
+          description: Execution timestamp
+          example: "2026-08-14T10:00:01Z"
+
+    CancelJobResponse:
+      description: Response payload after cancelling a job.
+      type: object
+      required:
+        - job_id
+        - status
+      properties:
+        job_id:
+          type: string
+          description: Cancelled Job ID
+          example: "job-spine-001"
+        status:
+          type: string
+          description: Status
+          example: "ABORTED"
+
+    RawStateResponse:
+      description: Key-value map representing raw SNMP observed state.
+      type: object
+      additionalProperties: true
+
+    DerivedStateResponse:
+      description: Key-value map representing scenario derived state.
+      type: object
+      additionalProperties: true
+
+    StateTransitionListResponse:
+      description: Response payload for listing state transition logs.
+      type: object
+      required:
+        - items
+        - total
+      properties:
+        items:
+          type: array
+          description: Array of state transition logs
+          items:
+            $ref: '#/components/schemas/StateTransitionLog'
+        total:
+          type: integer
+          description: Total count
+          example: 100
+
+    StateTransitionLog:
+      description: State transition log entity recording before/after values.
+      type: object
+      required:
+        - id
+        - target
+        - state_key
+        - old_value
+        - new_value
+        - trigger
+        - created_at
+      properties:
+        id:
+          type: string
+          description: Transition log ID
+          example: "stl-101"
+        target:
+          type: string
+          description: Target name
+          example: "spine1"
+        state_key:
+          type: string
+          description: OID or state key
+          example: "raw.spine1.IF-MIB::ifOperStatus.1"
+        old_value:
+          type: string
+          description: Old value before transition
+          example: "1"
+        new_value:
+          type: string
+          description: New value after transition
+          example: "2"
+        trigger:
+          type: string
+          description: Trigger type
+          example: "inform"
+        created_at:
+          type: string
+          description: Timestamp
+          example: "2026-08-14T10:00:01.120Z"
+
+    ExportFileResponse:
+      description: Response payload containing exported file data or download information.
+      type: object
+      required:
+        - filename
+        - download_url
+      properties:
+        filename:
+          type: string
+          description: File name
+          example: "audit-evidence-20260814.zip"
+        download_url:
+          type: string
+          description: Direct download URL
+          example: "/v1/audit/downloads/audit-evidence-20260814.zip"
+
+    StreamInfoResponse:
+      description: Information about active SSE connection stream.
+      type: object
+      required:
+        - stream_type
+      properties:
+        stream_type:
+          type: string
+          description: Type of stream
+          example: "text/event-stream"
+
+    EventPollResponse:
+      description: Response payload for event polling fallback.
+      type: object
+      required:
+        - events
+      properties:
+        events:
+          type: array
+          description: Events array
+          items:
+            $ref: '#/components/schemas/EventItem'
+
+    EventItem:
+      description: Single event item.
+      type: object
+      properties:
+        id:
+          type: string
+          description: Event ID
+          example: "evt-001"
+        type:
+          type: string
+          description: Event topic type
+          example: "job.step_advanced"
+        payload:
+          type: object
+          description: Event payload
+          additionalProperties: true
+        timestamp:
+          type: string
+          description: Timestamp
+          example: "2026-08-14T10:00:01Z"
+
+    MibTreeResponse:
+      description: Response payload containing parsed MIB tree nodes.
+      type: object
+      additionalProperties: true
+
+    AuditLogListResponse:
+      description: Response payload for listing operation audit logs.
+      type: object
+      required:
+        - items
+        - total
+      properties:
+        items:
+          type: array
+          description: Array of audit log entries
+          items:
+            type: object
+            additionalProperties: true
+        total:
+          type: integer
+          description: Total count
+          example: 50
+
+    InventoryImportRequest:
+      description: Request payload for importing targets.yaml.
+      type: object
+      required:
+        - yaml_content
+      properties:
+        yaml_content:
+          type: string
+          description: Text content of targets.yaml
+          example: "apiVersion: v1alpha1\ntargets: []"
+
+    InventoryImportResponse:
+      description: Response payload after bulk inventory import.
+      type: object
+      required:
+        - imported_targets_count
+        - imported_credentials_count
+      properties:
+        imported_targets_count:
+          type: integer
+          description: Number of targets imported
+          example: 4
+        imported_credentials_count:
+          type: integer
+          description: Number of credentials imported
+          example: 2
+        warnings:
+          type: array
+          description: Non-fatal warnings
+          items:
+            type: string
+            example: "Target 'leaf1' updated"
+
+    InventoryExportResponse:
+      description: Response payload containing exported targets.yaml.
+      type: object
+      required:
+        - yaml_content
+      properties:
+        yaml_content:
+          type: string
+          description: Exported YAML inventory
+          example: "apiVersion: v1alpha1\ntargets: []"
+
+    RestoreRequest:
+      description: Request payload for system restore.
+      type: object
+      required:
+        - archive_path
+      properties:
+        archive_path:
+          type: string
+          description: Path to backup archive on server
+          example: "/var/backups/musubi-20260814.tar.gz"
+
+    RestoreResponse:
+      description: Response payload after system restore.
+      type: object
+      required:
+        - restored
+        - tables_count
+      properties:
+        restored:
+          type: boolean
+          description: Whether restore succeeded
+          example: true
+        tables_count:
+          type: integer
+          description: Number of tables restored
+          example: 12
+
+    HealthzResponse:
+      description: Process liveness probe response.
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          description: Status string
+          example: "OK"
+
+    ReadyzResponse:
+      description: Readiness probe response.
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          description: Status string
+          example: "READY"
+
+    DeepHealthResponse:
+      description: Comprehensive diagnostics response.
+      type: object
+      required:
+        - status
+        - components
+      properties:
+        status:
+          type: string
+          description: Overall status
+          example: "HEALTHY"
+        components:
+          type: object
+          description: Component breakdown
+          additionalProperties: true
+
+    ProblemDetails:
+      description: RFC 7807 and RFC 9457 Problem Details Standard Error Object.
+      type: object
       required:
         - type
         - title
         - status
         - detail
+        - code
       properties:
         type:
           type: string
-          description: A URI reference that identifies the problem type.
-          example: https://example.com/errors/invalid-parameters
+          description: A URI reference identifying the problem type.
+          example: "https://musubi.dev/errors/target-in-use"
         title:
           type: string
-          description: A short, human-readable summary of the problem type.
-          example: Invalid Request Parameters
+          description: Short human-readable summary of problem.
+          example: "Target In Use"
         status:
           type: integer
-          description: The HTTP status code generated by the origin server.
-          example: 400
+          description: HTTP status code.
+          example: 409
         detail:
           type: string
-          description: A human-readable explanation specific to this occurrence of the problem.
-          example: The username field must not be empty.
+          description: Human-readable explanation of this specific occurrence.
+          example: "Target 'spine1' is locked by Job #job-001"
+        code:
+          type: string
+          description: Machine-readable stable error code.
+          example: "TARGET_IN_USE"
+        instance:
+          type: string
+          description: Request instance URI.
+          example: "/v1/targets/spine1"
+        actionable_guidance:
+          type: object
+          description: Resolution guidance and navigation links.
+          properties:
+            suggestion:
+              type: string
+              description: Suggested solution
+              example: "Wait for active job to finish or use drain mode."
+            links:
+              type: array
+              description: Actionable navigation links
+              items:
+                $ref: '#/components/schemas/ActionLink'
+
+    ActionLink:
+      description: Navigation action link.
+      type: object
+      properties:
+        rel:
+          type: string
+          description: Relationship
+          example: "drain"
+        href:
+          type: string
+          description: Target URL
+          example: "/v1/targets/spine1/drain"
+        method:
+          type: string
+          description: HTTP method
+          example: "POST"

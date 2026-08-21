@@ -12,6 +12,22 @@ import (
 // Tx is a transactional client that is created by calling Client.Tx().
 type Tx struct {
 	config
+	// AuditLog is the client for interacting with the AuditLog builders.
+	AuditLog *AuditLogClient
+	// CredentialProfile is the client for interacting with the CredentialProfile builders.
+	CredentialProfile *CredentialProfileClient
+	// Job is the client for interacting with the Job builders.
+	Job *JobClient
+	// JobStep is the client for interacting with the JobStep builders.
+	JobStep *JobStepClient
+	// Scenario is the client for interacting with the Scenario builders.
+	Scenario *ScenarioClient
+	// ScenarioVersion is the client for interacting with the ScenarioVersion builders.
+	ScenarioVersion *ScenarioVersionClient
+	// StateTransitionLog is the client for interacting with the StateTransitionLog builders.
+	StateTransitionLog *StateTransitionLogClient
+	// Target is the client for interacting with the Target builders.
+	Target *TargetClient
 	// User is the client for interacting with the User builders.
 	User *UserClient
 
@@ -145,6 +161,14 @@ func (tx *Tx) Client() *Client {
 }
 
 func (tx *Tx) init() {
+	tx.AuditLog = NewAuditLogClient(tx.config)
+	tx.CredentialProfile = NewCredentialProfileClient(tx.config)
+	tx.Job = NewJobClient(tx.config)
+	tx.JobStep = NewJobStepClient(tx.config)
+	tx.Scenario = NewScenarioClient(tx.config)
+	tx.ScenarioVersion = NewScenarioVersionClient(tx.config)
+	tx.StateTransitionLog = NewStateTransitionLogClient(tx.config)
+	tx.Target = NewTargetClient(tx.config)
 	tx.User = NewUserClient(tx.config)
 }
 
@@ -155,7 +179,7 @@ func (tx *Tx) init() {
 // of them in order to commit or rollback the transaction.
 //
 // If a closed transaction is embedded in one of the generated entities, and the entity
-// applies a query, for example: User.QueryXXX(), the query will be executed
+// applies a query, for example: AuditLog.QueryXXX(), the query will be executed
 // through the driver which created this transaction.
 //
 // Note that txDriver is not goroutine safe.
