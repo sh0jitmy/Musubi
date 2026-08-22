@@ -1,133 +1,312 @@
-# Go & SRE/DB/Security 開発用 GitHub テンプレートリポジトリ
+# Musubi (結び) - Air-gapped SNMP Scenario Orchestrator
 
-このリポジトリは、Go (Golang) によるセキュアで高信頼なWebアプリケーション開発を迅速に開始するための、GitHub テンプレートリポジトリです。
-CIでの静的解析、脆弱性診断、自動タグ付け (tagpr)、リリース管理 (GoReleaser) のパイプラインがあらかじめ統合されているほか、AIエージェントの回答品質を向上させるための日本語カスタムスキル（`.claude/skills`）を同梱しています。
+[![CI](https://github.com/sh0jitmy/Musubi/actions/workflows/ci.yml/badge.svg)](https://github.com/sh0jitmy/Musubi/actions/workflows/ci.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/sh0jitmy/musubi)](https://goreportcard.com/report/github.com/sh0jitmy/musubi)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+[![OpenAPI 3.1](https://img.shields.io/badge/OpenAPI-3.1.0-green.svg)](api/openapi.yaml)
 
-## 🚀 特徴
+**Musubi (結び)** は、エアギャップ（完全隔離）環境での自律稼働を前提に設計された、**高信頼・高性能なイベント駆動型 SNMP ネットワーク自動試験・状態監視プラットフォーム**です。
 
-1. **セキュアコーディングのお手本**: `main.go` には `slog` を用いた機密情報（パスワードやAPIキー等）の静的・動的マスキング処理が含まれています。
-2. **自動リリースパイプライン (tagpr & GoReleaser)**:
-   - `main` ブランチへのPRマージ時にリリース用PRが自動で作成・更新されます。
-   - リリースPRをマージすると自動的に `vX.Y.Z` タグが打たれ、GitHub Releases にクロスコンパイルされたバイナリが公開されます。
-3. **継続的インテグレーション (CI)**:
-   - `golangci-lint` による静的解析。
-   - `govulncheck` による依存パッケージの脆弱性診断。
-   - 競合検知付きの `go test` による自動検証。
-4. **AIエージェント用カスタムスキル**:
-   - 開発時に Claude Code や Cursor 等のAIエージェントに読み込ませることで、SRE/DBA/セキュリティの専門知識に基づいた設計・実装・レビューを自動で実施させることができます。
+複数の SNMP Agent（ルータ、スイッチ、サーバー等のネットワーク機器）に対して、宣言的な YAML シナリオに基づく自動試験、SNMP Trap / Inform 連動のリアルタイム検証、CEL (Common Expression Language) による型安全な状態評価、排他リースロックによる機器保護を提供します。
 
 ---
 
-## 🛠️ クイックスタート
+## 🌟 主な特徴 (Key Features)
 
-### 1. このリポジトリから新規リポジトリを作成
-GitHubの「Use this template」ボタンから、ご自身のリポジトリを作成します。
+* 🔒 **Air-gapped ＆ ゼロ外部依存設計**: インターネット接続のない隔離ラボ環境でも、単一バイナリおよび Docker Compose で完結稼働。
+* ⚡ **ミリ秒級のイベント駆動アーキテクチャ**: ポーリング待ちによるタイムラグを排し、SNMP Trap / Inform 受信と同時に CEL 条件評価を実行してシナリオを即座に進捗。
+* 📐 **CEL (Common Expression Language) による宣言的評価**: `raw['spine1']['IF-MIB::ifOperStatus.1'] == 'up'` のような直感的で高速・型安全な条件判定。
+* 🛡️ **Lease Lock によるターゲット保護**: 複数エンジニアや並行テストによるターゲット機器の競合や誤設定変更を自動でブロック。
+* 📊 **統合オブザーバビリティ (VictoriaMetrics & Grafana)**: CPU・メモリ・帯域・SNMP テレメトリ・MIB テーブル・Trap ログをリアルタイム可視化する公式ダッシュボードを同梱。
+* 🧩 **OpenAPI 3.1 & REST / SSE API 完備**: 全機能を標準化された RESTful API および SSE (Server-Sent Events) ストリームで外部公開。CLI (`musubi-cli`) も標準提供。
 
-### 2. モジュール名の変更
-作成したリポジトリの `go.mod` 内のモジュール名を変更します。
-```go
-module github.com/your-username/your-repo-name
+---
+
+## 🏗️ システムアーキテクチャ (Architecture Overview)
+
+Musubi は「モジュラーモノリス (Modular Monolith) ＆ マイクロサービス対応」アーキテクチャを採用しており、高スループットな非同期処理と明確なドメイン境界を備えています。
+
+```mermaid
+graph TB
+    subgraph Clients["Clients & Visualization Layer"]
+        CLI["Musubi CLI (musubi-cli)"]
+        WebUI["Web Browser / REST Client"]
+        Grafana["Grafana Dashboard (:3000)"]
+    end
+
+    subgraph MusubiServer["Musubi Core Engine (musubi-server :8080)"]
+        Gateway["REST API & SSE Gateway\n(Gin / OpenAPI 3.1)"]
+        Orchestrator["Scenario Orchestrator\n(DAG Engine & Pre-flight)"]
+        CELEval["CEL Evaluator\n(State Condition Matcher)"]
+        StateStore["State Repository\n(Raw & Derived State)"]
+        LifecycleMgr["Lifecycle & Lease Lock\n(Target In-Use Protection)"]
+        Collector["SNMP Collector & Listener\n(UDP 162 Trap/Inform & Poller)"]
+        NotifHub["Notification Hub\n(Ring-buffer Event Streamer)"]
+    end
+
+    subgraph StorageLayer["Data & Telemetry Storage"]
+        EntDB[("PostgreSQL / SQLite\n(Ent ORM Persistence)")]
+        TSDB["VictoriaMetrics (:8428)\n(Prometheus-compatible TSDB)"]
+    end
+
+    subgraph NetworkTargets["Network Devices & Test Target Sets"]
+        Device1["Spine / Leaf Switches"]
+        Device2["Routers & Firewalls"]
+        MockAgent["Pure-Go Mock SNMP Agent (:161)"]
+    end
+
+    %% Flow connections
+    CLI --> Gateway
+    WebUI --> Gateway
+    Grafana --> TSDB
+    Grafana --> Gateway
+
+    Gateway --> Orchestrator
+    Gateway --> StateStore
+    Gateway --> LifecycleMgr
+    Gateway --> NotifHub
+
+    Orchestrator --> CELEval
+    Orchestrator --> LifecycleMgr
+    Orchestrator --> StateStore
+    Orchestrator --> Collector
+
+    Collector --> StateStore
+    Collector --> NotifHub
+    Collector <--> NetworkTargets
+
+    Gateway --> EntDB
+    Gateway --> TSDB
 ```
-また、`main.go` や `.goreleaser.yaml` などに含まれるプロジェクト名も必要に応じて書き換えてください。
 
-### 3. AIカスタムスキルのインストール (任意)
-同梱されているカスタムスキルをお使いのPC（グローバル）にインストールして、すべての Claude Code セッションで有効にします：
+---
+
+## 📁 リポジトリ構成 (Repository Structure)
+
+```
+Musubi/
+├── api/
+│   └── openapi.yaml               # OpenAPI 3.1 API 完全定義仕様書
+├── cmd/
+│   ├── musubi-server/             # Musubi メインサーバーバイナリ
+│   ├── musubi-cli/                # 運用・自動化用 CLI ツール
+│   └── mock-snmp-agent/           # テスト・検証用 Pure-Go Mock SNMP エージェント
+├── deploy/
+│   ├── grafana/                   # Grafana プロビジョニング設定 & 監視ダッシュボード
+│   └── victoriametrics/           # VictoriaMetrics (TSDB) 設定
+├── docs/
+│   ├── user_manual.md             # 📖 エンドユーザー向け完全利用マニュアル
+│   ├── architecture.md            # 🏛️ 詳細アーキテクチャ設計仕様書
+│   ├── maintenance_guide.md       # 🔧 メンテナー向け保守・トラブルシューティングガイド
+│   └── adr/                       # アーキテクチャ決定記録 (ADR)
+├── ent/                           # Ent ORM スキーマ定義 & 自動生成コード
+├── internal/
+│   ├── collector/                 # SNMP Trap/Inform リスナー & SNMP クライアント
+│   ├── common/                    # 共通基盤 (errors, batcher, lifecycle, telemetry, notification)
+│   ├── database/                  # DB 接続 & 初期シード管理
+│   ├── gateway/                   # REST API ルーター & ミドルウェア
+│   ├── orchestrator/              # シナリオパーサー, プリフライト検証, ジョブランナー
+│   ├── state/                     # CEL 評価エンジン & 状態リポジトリ
+│   └── testutil/                  # テスト用ユーティリティ & Mock SNMP Agent
+├── scripts/
+│   ├── demo.sh                    # フルスタック動作確認用ワンコマンドデモ
+│   └── docker_e2e.sh              # Docker Compose E2E 自動テストスイート
+├── docker-compose.yml             # コンテナ一括起動用 Docker Compose 定義
+├── Dockerfile                     # マルチステージビルド Dockerfile
+├── Makefile                       # ビルド・テスト・静的解析自動化 Makefile
+├── REQUIREMENTS.md                # 要件チェックリスト & 自己評価レポート
+└── README.md                      # 本ドキュメント
+```
+
+---
+
+## 🚀 クイックスタート (Quick Start)
+
+### 1. Docker Compose での一括起動 (推奨)
+
 ```bash
-make install
+# スタック全体のビルド & 起動 (Musubi, Mock Agent, VictoriaMetrics, Grafana)
+docker compose up -d --build
+
+# 起動状態のヘルスチェック
+curl -s http://localhost:8080/v1/system/healths | jq .
 ```
-*(内部的に `~/.claude/skills/` にコピーします)*
+
+* 🌐 **REST API & Swagger/OpenAPI**: `http://localhost:8080/v1/system/healthz`
+* 📊 **Grafana ダッシュボード**: `http://localhost:3000/d/musubi-overview`
+* 📈 **VictoriaMetrics TSDB**: `http://localhost:8428`
 
 ---
 
-## ⚙️ 開発コマンド一覧
+### 2. ワンコマンド デモスクリプトの実行
 
-Makefile に定義されている以下のコマンドを使用して開発を進めます：
+スタックの起動から、認証プロファイル作成、ターゲット登録、シナリオ登録、ジョブ実行までを完全自動で体験できます：
+
+```bash
+./scripts/demo.sh
+```
+
+---
+
+### 3. ローカルバイナリのビルドと起動
+
+```bash
+# 全バイナリを bin/ に一括ビルド
+make build
+
+# サーバーの起動 (ポート 8080, UDP 162 でリスン)
+./bin/musubi-server
+
+# CLI ヘルプの確認
+./bin/musubi-cli --help
+```
+
+---
+
+## 💡 基本的な使い方 (Basic Usage Workflow)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as オペレーター / CI
+    participant CLI as musubi-cli
+    participant API as musubi-server
+    participant Device as ネットワーク機器 (SNMP)
+
+    Note over User,API: 1. 準備フェーズ
+    User->>CLI: credentials create (SNMP v3認証情報)
+    CLI->>API: POST /v1/credentials
+    User->>CLI: targets create (機器IP・ポート・ラベル)
+    CLI->>API: POST /v1/targets
+    User->>CLI: scenarios import -f scenario.yaml
+    CLI->>API: POST /v1/scenarios
+
+    Note over User,Device: 2. 試験実行フェーズ
+    User->>CLI: scenarios run --name bgp-check
+    CLI->>API: POST /v1/scenarios/{name}/runs
+    API->>API: ターゲット排他ロック獲得 (Lease Lock)
+    API->>Device: SNMP GET / SET 実行
+    Device-->>API: SNMP Trap / Inform 送信
+    API->>API: CEL 式による状態評価 (wait.until)
+    API-->>User: SSE リアルタイム進捗通知 / Grafana 可視化
+    API->>API: ロック解放 & Teardown 実行 (完了)
+```
+
+### ステップ 1: 認証プロファイル & ターゲット登録
+```bash
+# SNMP v3 認証プロファイル作成
+./bin/musubi-cli credentials create \
+  --name "v3-admin" \
+  --version "v3" \
+  --sec-level "authPriv" \
+  --username "admin" \
+  --auth-proto "SHA256" --auth-pass "AuthPass123!" \
+  --priv-proto "AES"    --priv-pass "PrivPass123!"
+
+# ターゲット機器登録
+./bin/musubi-cli targets create \
+  --name "spine1" \
+  --host "192.168.10.1" \
+  --port 161 \
+  --credential "v3-admin" \
+  --labels "role=spine,site=dc1"
+```
+
+### ステップ 2: シナリオ YAML の作成と登録
+```yaml
+# scenarios/linkdown.yaml
+name: "spine1-failover-test"
+target_locks: ["spine1"]
+steps:
+  - id: "check_link_up"
+    target: "spine1"
+    wait:
+      until: "raw['spine1']['IF-MIB::ifOperStatus.1'] == 'up'"
+      timeout: "5s"
+  - id: "inject_link_down"
+    target: "spine1"
+    action: "action.snmp_set"
+    params:
+      oid: "1.3.6.1.2.1.2.2.1.7.1"
+      type: "int"
+      value: 2
+teardown:
+  - id: "restore_link"
+    target: "spine1"
+    action: "action.snmp_set"
+    params:
+      oid: "1.3.6.1.2.1.2.2.1.7.1"
+      type: "int"
+      value: 1
+```
+
+```bash
+# シナリオのインポート
+./bin/musubi-cli scenarios import --file ./scenarios/linkdown.yaml
+```
+
+### ステップ 3: シナリオ実行 & 進捗確認
+```bash
+# シナリオの実行
+./bin/musubi-cli scenarios run --name "spine1-failover-test"
+
+# ジョブのステータス & ログ確認
+./bin/musubi-cli jobs status --id "<JOB_ID>"
+./bin/musubi-cli jobs logs --id "<JOB_ID>"
+```
+
+---
+
+## 📊 Grafana モニタリングダッシュボード
+
+Musubi には、VictoriaMetrics と連携した公式 Grafana ダッシュボードがプリセットされています。
+
+* **URL**: `http://localhost:3000/d/musubi-overview`
+
+```
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│  Musubi System Overview & Live Telemetry Dashboard                                     │
+├────────────────────────────────┬───────────────────────┬───────────────────────────────┤
+│  ⚡ CPU Utilization           │  🧠 Memory Usage      │  🌐 Network Bandwidth (Rx/Tx) │
+│  [======== 4.2% ========]      │  [==== 18.5 MB =====] │  Rx: 1.2 MB/s | Tx: 850 KB/s  │
+├────────────────────────────────┴───────────────────────┴───────────────────────────────┤
+│  📊 Live SNMP Telemetry & Trap Operations                                              │
+│  - Total Traps Received: 1,420 pkts/s      - SNMP Operations P95: 1.8 ms               │
+│  - Active Target Locks : 2 locked          - Running Jobs Count : 1 running            │
+├────────────────────────────────────────────────────────────────────────────────────────┤
+│  🎯 Target Selector: [ spine1 ▼ ]                                                      │
+│  - Latest MIB Data Tree Table (IF-MIB, IP-MIB, HOST-RESOURCES-MIB, BGP4-MIB)           │
+│  - Real-time Trap/Inform Audit Logs Stream Table                                       │
+└────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 📚 ドキュメント一覧 (Documentation Index)
+
+| ドキュメント | 対象読者 | 主な内容 |
+| :--- | :--- | :--- |
+| 📖 [ユーザー利用マニュアル](docs/user_manual.md) | 利用者・オペレーター | 実行方法、シナリオ作成詳細、CEL式リファレンス、運用手順、トラブルシューティング |
+| 🏛️ [アーキテクチャ設計仕様書](docs/architecture.md) | 設計者・アーキテクト | モジュラーモノリス設計、ドメイン境界、シーケンス図、ライフサイクル置換表 |
+| 🔧 [メンテナー向け保守ガイド](docs/maintenance_guide.md) | メンテナー・開発者 | 内部実装構造、カバレッジ基準 (80%+)、静的解析、デバッグ手順 |
+| 📄 [OpenAPI 3.1 仕様書](api/openapi.yaml) | API 連携開発者 | RESTful API エンドポイント、リクエスト/レスポンス JSON スキーマ定義 |
+
+---
+
+## ⚙️ 開発・検証コマンド一覧 (Development Commands)
 
 | コマンド | 説明 |
 | :--- | :--- |
-| `make fmt` | ソースコードのフォーマットおよびリンターによる自動修正 |
-| `make lint` | `golangci-lint` を使用した静的解析の実行 |
-| `make tidy` | 依存関係 (`go.mod` / `go.sum`) の整理 |
-| `make vulncheck` | `govulncheck` を使用した脆弱性診断の実行 |
-| `make test` | データ競合検知 (`-race`) およびカバレッジ測定付きテストの実行 |
-| `make build` | `bin/app` へのコンパイルの実行 |
-| `make release-snapshot` | `GoReleaser` によるローカルでのスナップショットビルドテスト |
-| `make check` | 同梱スキルのマークダウン文法チェック |
-| `make self-eval` | リポジトリが要件を満たしているかの自己評価の実行 (`REQUIREMENTS.md` の更新) |
-| `make clean` | ビルド成果物やテストキャッシュのクリーンアップ |
+| `make fmt` | ソースコードのフォーマット (`go fmt` / リンター自動修正) |
+| `make lint` | `golangci-lint` による全パッケージの厳格な静的解析 |
+| `make test` | データ競合検知 (`-race`) および 80% 基準カバレッジ測定付きテスト実行 |
+| `make build` | `bin/` 配下への全実行可能バイナリ (`musubi-server`, `musubi-cli`, `mock-snmp-agent`) コンパイル |
+| `make docker-test` | Docker Compose 環境での E2E 自動検証スクリプト実行 |
+| `make openapi-lint` | Spectral による OpenAPI 3.1 スキーマ文法検証 |
+| `make clean` | 一時ファイル、バイナリ成果物、テストキャッシュの削除 |
 
 ---
 
-## ☁️ さくらのクラウド Terraform CI/CD
+## 📄 ライセンス (License)
 
-本テンプレートには、さくらのクラウド用の Terraform CI/CD ワークフローが含まれています。`terraform/` ディレクトリ配下のファイルに変更があった場合のみトリガーされます。
-
-### 🔑 GitHub Secrets の設定
-このワークフローを正常に実行するには、事前にGitHubリポジトリの設定（`Settings -> Secrets and variables -> Actions`）から、以下の GitHub Secrets を必ず登録してください。
-
-| Secret 名 | 説明 |
-| :--- | :--- |
-| `SAKURA_ACCESS_TOKEN` | さくらのクラウド API アクセストークン |
-| `SAKURA_ACCESS_TOKEN_SECRET` | さくらのクラウド API アクセストークンシークレット |
-| `AWS_ACCESS_KEY_ID` | S3互換バックエンド (State管理) 用の AWS Access Key ID |
-| `AWS_SECRET_ACCESS_KEY` | S3互換バックエンド (State管理) 用の AWS Secret Access Key |
-
----
-
-## 📋 REQUIREMENTS.md による品質自己評価とカスタマイズ
-
-本テンプレートには、開発時のチェックリストとして `REQUIREMENTS.md` が含まれています。
-`make self-eval` コマンドを実行すると、このファイルのチェックボックス（`[ ]` と `[x]`）が集計され、適合率（パーセンテージ）が動的に自動計算されてファイル下部に書き込まれます。
-
-### 🛠️ カスタマイズ方法（独自の要件の追加）
-
-開発するプロジェクトに合わせて、`REQUIREMENTS.md` に独自の機能要件や非機能要件を自由に追加・変更できます。
-
-1. **`REQUIREMENTS.md` を開く**
-2. **`## 📋 要件チェックリスト` セクションの下に、項目を追加する**
-   - 項目は必ず `- [ ]` (未達成) または `- [x]` (達成) のフォーマットで記述してください。
-   - 例：
-     ```markdown
-     ### 3. プロジェクト固有の機能要件
-     - [ ] **R-3.1 ユーザー認証API**: JWTによる認証機能が実装され、E2Eテストがパスすること。
-     - [ ] **R-3.2 データベース移行**: マイグレーションスクリプトが作成されていること。
-     ```
-3. **セルフチェックの実行**
-   - 項目を追加した後に、以下のコマンドを実行します：
-     ```bash
-     make self-eval
-     ```
-   - これにより、追加したチェックボックスを含めた最新の適合率が自動的に集計され、`## 📈 自己評価結果` セクションが更新されます。
-
----
-
-## 📄 ライセンスと作成者 (AUTHOR) のカスタマイズ
-
-本リポジトリは **Apache License 2.0** でライセンスされています。複製して使用する際は、以下の項目をご自身の情報にカスタマイズしてご利用ください。
-
-### 1. LICENSE ファイルの更新
-リポジトリルートにある [LICENSE](LICENSE) ファイル内の `[Copyright Holder]` 部分をご自身の名称または組織名に書き換えてください。
-
-### 2. カスタムスキル (author) の一括置換
-同梱されている各カスタムスキル (`.claude/skills/*/SKILL.md`) のフロントマターに定義されている `author: [YOUR_NAME]` を、ご自身の名称に変更してください。
-
-以下のワンコマンドを使用して、すべてのスキルファイルに対して一括置換を実行できます：
-
-**macOS (BSD sed) の場合:**
-```bash
-find .claude/skills -name "SKILL.md" -exec sed -i '' 's/\[YOUR_NAME\]/ご自身の名前/g' {} +
-```
-
-**Linux (GNU sed) の場合:**
-```bash
-find .claude/skills -name "SKILL.md" -exec sed -i 's/\[YOUR_NAME\]/ご自身の名前/g' {} +
-```
-
----
-
-## 🔒 ログ出力時の機密情報保護指針
-`golang-implementation` スキルに準拠し、本テンプレートでは以下のマスキング機構が実装されています。
-
-- **`SecretString` 型**: ログに出力しようとすると、自動的に `[REDACTED]` に置き換わります。
-- **`HashableSecret` 型**: ソルト付きハッシュ化された値を出力し、ログの検索性を維持しつつ秘匿します。
-- **`NewSecureJSONHandler`**: ログのキー名が `password`, `token`, `secret`, `authorization` の属性を検知した場合、動的に値を `[REDACTED]` へ一括マスキングします。
+本プロジェクトは **Apache License 2.0** の下で公開されています。詳細については [LICENSE](LICENSE) ファイルをご参照ください。
