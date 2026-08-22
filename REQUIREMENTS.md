@@ -2,6 +2,7 @@
 
 本ドキュメントは **SNMP Scenario Orchestrator (Musubi)** のソフトウェア要件仕様（SRS）およびプロジェクトの要件適合度を評価・管理するための要件一覧です。PDM (Product Development Manager) との合意形成および開発進捗の判定ベースとして利用します。
 
+
 ---
 
 # 1. プロジェクト概要
@@ -20,6 +21,7 @@ SNMP Managerとして動作し、複数のSNMP Agentに対してシナリオベ�
 # 2. システムアーキテクチャ & コアコンポーネント
 
 ```
+
                             ┌─────────────────────────────────────────┐
                             │    User Frontend / Portal / CI/CD       │
                             │    & Standard Grafana Dashboards        │
@@ -54,6 +56,7 @@ SNMP Managerとして動作し、複数のSNMP Agentに対してシナリオベ�
 ---
 
 # 3. コア機能要件・設計詳細
+
 
 ### 3.1. NotificationHub & 責務分離
 - **`NotificationHub`**: 外部メッセージバスとの混同を防ぐため改名。責務を「通知のIn-Memory Pub/Sub配送」に限定し、状態や差分検知ロジックは一切持たない。
@@ -111,6 +114,7 @@ SNMP Managerとして動作し、複数のSNMP Agentに対してシナリオベ�
 - **GitOps シナリオ一括エクスポート/インポート**: `/api/v1/scenarios/export` & `/import` による環境間シナリオ YAML 移行。
 - **Liveness & Readiness ヘルスチェック**: `/healthz` & `/readyz` による自己診断。
 
+
 ---
 
 # 4. 要件チェックリスト
@@ -131,6 +135,7 @@ SNMP Managerとして動作し、複数のSNMP Agentに対してシナリオベ�
 - [x] **R-2.7 テスト品質の自動検証**: `TestMain` での goroutine リーク検出（`goleak`）および `golangci-lint` でのテスト品質監査が設定されていること。
 - [x] **R-2.8 ライセンス＆作成者ヘッダーの自動監査**: `make license-check` を通して Go ソースファイルのライセンス・作成者ヘッダーの欠落を自動検証できること。
 - [x] **R-2.9 OpenAPI 駆動開発の準拠**: `api/openapi.yaml` を定義し、REST API の仕様が公開されること。
+
 
 ### 3. 要件定義・アーキテクチャ設計仕様 (PDM合意済み)
 - [x] **R-3.1 Scenario Engine & DSL 仕様策定**: YAML (v1alpha1) の解析、`action`, `wait` (CEL式評価), `parallel` (Join対応), `loop`, `sleep` の制御ロジック仕様が策定・合意されていること。
@@ -174,17 +179,3 @@ SNMP Managerとして動作し、複数のSNMP Agentに対してシナリオベ�
 - **合計要件数**: 42
 - **達成要件数**: 44 / 44
 - **適合率 (達成数/44)**: 100.00 %
-
-
-
-
-
-
-
-
-
-
-
-
-
-
