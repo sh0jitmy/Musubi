@@ -9,7 +9,7 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
-	"github.com/shjtmy/go_sh0jitmy_template/ent/statetransitionlog"
+	"github.com/sh0jitmy/musubi/ent/statetransitionlog"
 )
 
 // StateTransitionLog is the model entity for the StateTransitionLog schema.

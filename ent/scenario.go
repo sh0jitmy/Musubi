@@ -9,7 +9,7 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
-	"github.com/shjtmy/go_sh0jitmy_template/ent/scenario"
+	"github.com/sh0jitmy/musubi/ent/scenario"
 )
 
 // Scenario is the model entity for the Scenario schema.

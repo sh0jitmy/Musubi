@@ -9,7 +9,7 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
-	"github.com/shjtmy/go_sh0jitmy_template/ent/credentialprofile"
+	"github.com/sh0jitmy/musubi/ent/credentialprofile"
 )
 
 // CredentialProfile is the model entity for the CredentialProfile schema.

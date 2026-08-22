@@ -5,16 +5,16 @@ package ent
 import (
 	"time"
 
-	"github.com/shjtmy/go_sh0jitmy_template/ent/auditlog"
-	"github.com/shjtmy/go_sh0jitmy_template/ent/credentialprofile"
-	"github.com/shjtmy/go_sh0jitmy_template/ent/job"
-	"github.com/shjtmy/go_sh0jitmy_template/ent/jobstep"
-	"github.com/shjtmy/go_sh0jitmy_template/ent/scenario"
-	"github.com/shjtmy/go_sh0jitmy_template/ent/scenarioversion"
-	"github.com/shjtmy/go_sh0jitmy_template/ent/schema"
-	"github.com/shjtmy/go_sh0jitmy_template/ent/statetransitionlog"
-	"github.com/shjtmy/go_sh0jitmy_template/ent/target"
-	"github.com/shjtmy/go_sh0jitmy_template/ent/user"
+	"github.com/sh0jitmy/musubi/ent/auditlog"
+	"github.com/sh0jitmy/musubi/ent/credentialprofile"
+	"github.com/sh0jitmy/musubi/ent/job"
+	"github.com/sh0jitmy/musubi/ent/jobstep"
+	"github.com/sh0jitmy/musubi/ent/scenario"
+	"github.com/sh0jitmy/musubi/ent/scenarioversion"
+	"github.com/sh0jitmy/musubi/ent/schema"
+	"github.com/sh0jitmy/musubi/ent/statetransitionlog"
+	"github.com/sh0jitmy/musubi/ent/target"
+	"github.com/sh0jitmy/musubi/ent/user"
 )
 
 // The init function reads all schema descriptors with runtime code

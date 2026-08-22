@@ -10,7 +10,7 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
-	"github.com/shjtmy/go_sh0jitmy_template/ent/target"
+	"github.com/sh0jitmy/musubi/ent/target"
 )
 
 // Target is the model entity for the Target schema.

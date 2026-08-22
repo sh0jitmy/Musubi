@@ -6,7 +6,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/shjtmy/go_sh0jitmy_template/ent"
+	"github.com/sh0jitmy/musubi/ent"
 )
 
 // The AuditLogFunc type is an adapter to allow the use of ordinary

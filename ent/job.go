@@ -10,7 +10,7 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
-	"github.com/shjtmy/go_sh0jitmy_template/ent/job"
+	"github.com/sh0jitmy/musubi/ent/job"
 )
 
 // Job is the model entity for the Job schema.

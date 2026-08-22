@@ -11,8 +11,8 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
-	"github.com/shjtmy/go_sh0jitmy_template/ent/job"
-	"github.com/shjtmy/go_sh0jitmy_template/ent/predicate"
+	"github.com/sh0jitmy/musubi/ent/job"
+	"github.com/sh0jitmy/musubi/ent/predicate"
 )
 
 // JobQuery is the builder for querying Job entities.

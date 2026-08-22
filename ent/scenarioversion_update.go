@@ -11,8 +11,8 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/dialect/sql/sqljson"
 	"entgo.io/ent/schema/field"
-	"github.com/shjtmy/go_sh0jitmy_template/ent/predicate"
-	"github.com/shjtmy/go_sh0jitmy_template/ent/scenarioversion"
+	"github.com/sh0jitmy/musubi/ent/predicate"
+	"github.com/sh0jitmy/musubi/ent/scenarioversion"
 )
 
 // ScenarioVersionUpdate is the builder for updating ScenarioVersion entities.

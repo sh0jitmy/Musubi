@@ -10,7 +10,7 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
-	"github.com/shjtmy/go_sh0jitmy_template/ent/jobstep"
+	"github.com/sh0jitmy/musubi/ent/jobstep"
 )
 
 // JobStep is the model entity for the JobStep schema.

@@ -9,20 +9,20 @@ import (
 	"log"
 	"reflect"
 
-	"github.com/shjtmy/go_sh0jitmy_template/ent/migrate"
+	"github.com/sh0jitmy/musubi/ent/migrate"
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect"
 	"entgo.io/ent/dialect/sql"
-	"github.com/shjtmy/go_sh0jitmy_template/ent/auditlog"
-	"github.com/shjtmy/go_sh0jitmy_template/ent/credentialprofile"
-	"github.com/shjtmy/go_sh0jitmy_template/ent/job"
-	"github.com/shjtmy/go_sh0jitmy_template/ent/jobstep"
-	"github.com/shjtmy/go_sh0jitmy_template/ent/scenario"
-	"github.com/shjtmy/go_sh0jitmy_template/ent/scenarioversion"
-	"github.com/shjtmy/go_sh0jitmy_template/ent/statetransitionlog"
-	"github.com/shjtmy/go_sh0jitmy_template/ent/target"
-	"github.com/shjtmy/go_sh0jitmy_template/ent/user"
+	"github.com/sh0jitmy/musubi/ent/auditlog"
+	"github.com/sh0jitmy/musubi/ent/credentialprofile"
+	"github.com/sh0jitmy/musubi/ent/job"
+	"github.com/sh0jitmy/musubi/ent/jobstep"
+	"github.com/sh0jitmy/musubi/ent/scenario"
+	"github.com/sh0jitmy/musubi/ent/scenarioversion"
+	"github.com/sh0jitmy/musubi/ent/statetransitionlog"
+	"github.com/sh0jitmy/musubi/ent/target"
+	"github.com/sh0jitmy/musubi/ent/user"
 )
 
 // Client is the client that holds all ent builders.

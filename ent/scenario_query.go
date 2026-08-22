@@ -11,8 +11,8 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
-	"github.com/shjtmy/go_sh0jitmy_template/ent/predicate"
-	"github.com/shjtmy/go_sh0jitmy_template/ent/scenario"
+	"github.com/sh0jitmy/musubi/ent/predicate"
+	"github.com/sh0jitmy/musubi/ent/scenario"
 )
 
 // ScenarioQuery is the builder for querying Scenario entities.

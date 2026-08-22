@@ -10,8 +10,8 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
-	"github.com/shjtmy/go_sh0jitmy_template/ent/auditlog"
-	"github.com/shjtmy/go_sh0jitmy_template/ent/predicate"
+	"github.com/sh0jitmy/musubi/ent/auditlog"
+	"github.com/sh0jitmy/musubi/ent/predicate"
 )
 
 // AuditLogUpdate is the builder for updating AuditLog entities.

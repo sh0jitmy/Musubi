@@ -54,13 +54,13 @@ metadata:
 
 - **連携させるカスタムスキル**:
   1. **設計・アーキテクチャの適合性確認 (Design & Architecture)**:
-     - **適用スキル**: [golang-design](file:///Users/shjtmy/gravity/claude_code_skills/.claude/skills/golang-design/SKILL.md) / [software-architecture](file:///Users/shjtmy/gravity/claude_code_skills/.claude/skills/software-architecture/SKILL.md)
+     - **適用スキル**: [golang-design](file:///Users/sh0jitmy/gravity/claude_code_skills/.claude/skills/golang-design/SKILL.md) / [software-architecture](file:///Users/sh0jitmy/gravity/claude_code_skills/.claude/skills/software-architecture/SKILL.md)
      - **検証**: Goの設計原則（Accept interfaces, return structs、DI）、およびモジュラーモノリス境界が維持されているか。
   2. **品質・テスト網羅性の確認 (Quality & Testing)**:
-     - **適用スキル**: [quality-inspector](file:///Users/shjtmy/gravity/claude_code_skills/.claude/skills/quality-inspector/SKILL.md) / [golang-e2e-testing](file:///Users/shjtmy/gravity/claude_code_skills/.claude/skills/golang-e2e-testing/SKILL.md)
+     - **適用スキル**: [quality-inspector](file:///Users/sh0jitmy/gravity/claude_code_skills/.claude/skills/quality-inspector/SKILL.md) / [golang-e2e-testing](file:///Users/sh0jitmy/gravity/claude_code_skills/.claude/skills/golang-e2e-testing/SKILL.md)
      - **検証**: 単体・E2Eテストの網羅性、FMEA/FTAに基づく障害模擬テスト（自己修復・エラーマスク）の適合性。
   3. **セキュリティおよびインフラ構成の確認 (Security & Infrastructure)**:
-     - **適用スキル**: [sre-deployment](file:///Users/shjtmy/gravity/claude_code_skills/.claude/skills/sre-deployment/SKILL.md)
+     - **適用スキル**: [sre-deployment](file:///Users/sh0jitmy/gravity/claude_code_skills/.claude/skills/sre-deployment/SKILL.md)
      - **検証**: APIキーなどのプレーンテキストでのハードコードの有無、ACME証明書の自動更新と永続キャッシュ、ライセンス適合。
 
 #### ローカルレビュー報告形式
@@ -93,7 +93,7 @@ metadata:
 GitHub上でプルリクエストが作成された際、GitHub Copilot PR Review機能により自動的にコードレビューを行います。
 
 - **連携と設定基準**:
-  - **適用スキル**: [github-copilot-review](file:///Users/shjtmy/gravity/claude_code_skills/.claude/skills/github-copilot-review/SKILL.md)
+  - **適用スキル**: [github-copilot-review](file:///Users/sh0jitmy/gravity/claude_code_skills/.claude/skills/github-copilot-review/SKILL.md)
   - Copilotは外部スキルファイルに直接アクセスできないため、リポジトリルートに配置された `.github/copilot-instructions.md` のカスタム指示を読み込ませて自己完結的にレビューを行わせます。
   - 指示ファイル内のレビュー観点は、本リポジトリの設計（`golang-design`）、セキュリティ（`sre-deployment`）、品質（`quality-inspector`）、オブザーバビリティ（`golang-observability`）に完全に準拠している必要があります。
   - レビュー結果は、開発の適合性を担保するため、**完全に日本語で出力されるよう指示を明示**します。

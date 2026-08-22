@@ -10,7 +10,7 @@ import (
 
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
-	"github.com/shjtmy/go_sh0jitmy_template/ent/auditlog"
+	"github.com/sh0jitmy/musubi/ent/auditlog"
 )
 
 // AuditLogCreate is the builder for creating a AuditLog entity.
