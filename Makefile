@@ -70,7 +70,12 @@ test: generate
 build: generate
 	@echo "==> Building binary..."
 	@mkdir -p bin
-	@go build -v -o bin/app ./cmd/app
+	@if [ -d "./cmd" ] && [ -n "$$(ls -A ./cmd 2>/dev/null)" ]; then \
+		go build -v -o bin/ ./cmd/...; \
+	else \
+		echo "==> No cmd executables in this layer, compiling packages..."; \
+		go test -run=^$$ ./...; \
+	fi
 
 release-check:
 	@echo "==> Validating GoReleaser configuration..."
