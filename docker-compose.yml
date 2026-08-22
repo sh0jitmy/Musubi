@@ -1,0 +1,106 @@
+name: musubi-stack
+
+services:
+  musubi-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: musubi-server
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+      - "162:162/udp"
+    environment:
+      - PORT=8080
+      - DATABASE_DRIVER=postgres
+      - DATABASE_DSN=postgres://musubi:musubi_secret@postgres:5432/musubi?sslmode=disable
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/v1/system/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - musubi-net
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: musubi-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: musubi
+      POSTGRES_USER: musubi
+      POSTGRES_PASSWORD: musubi_secret
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U musubi -d musubi"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - musubi-net
+
+  victoriametrics:
+    image: victoriametrics/victoria-metrics:v1.99.0
+    container_name: musubi-victoriametrics
+    restart: unless-stopped
+    ports:
+      - "8428:8428"
+    volumes:
+      - ./deploy/victoriametrics/prometheus.yml:/etc/prometheus.yml:ro
+      - vmdata:/victoria-metrics-data
+    command:
+      - "-promscrape.config=/etc/prometheus.yml"
+      - "-promscrape.config.strictParse=false"
+      - "-storageDataPath=/victoria-metrics-data"
+    networks:
+      - musubi-net
+
+  grafana:
+    image: grafana/grafana:10.4.0
+    container_name: musubi-grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+    volumes:
+      - ./deploy/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./deploy/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - victoriametrics
+      - postgres
+    networks:
+      - musubi-net
+
+  mock-snmp-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: musubi-mock-snmp-agent
+    restart: unless-stopped
+    entrypoint: ["/usr/local/bin/mock-snmp-agent"]
+    ports:
+      - "161:161/udp"
+    environment:
+      - SNMP_PORT=161
+      - TRAP_TARGET=musubi-server:162
+    networks:
+      - musubi-net
+
+volumes:
+  pgdata:
+  vmdata:
+
+networks:
+  musubi-net:
+    driver: bridge
