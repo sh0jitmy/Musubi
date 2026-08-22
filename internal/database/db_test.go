@@ -26,33 +26,41 @@ import (
 	"go.uber.org/goleak"
 )
 
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m)
+}
+
 func TestNewClient_SQLite(t *testing.T) {
-	defer goleak.VerifyNone(t)
+	t.Parallel()
 
 	ctx := context.Background()
 	client, err := NewClient(ctx, "sqlite3", "file:db_test?mode=memory&cache=shared&_pragma=foreign_keys(1)")
 	require.NoError(t, err)
-	defer client.Close()
+	defer func() {
+		_ = client.Close()
+	}()
 
 	// Seed admin user
 	err = SeedAdminUser(ctx, client)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Verify admin exists
 	exists, err := client.User.Query().Where(user.Username("admin")).Exist(ctx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, exists)
 
 	// Second seed should be idempotent
 	err = SeedAdminUser(ctx, client)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Test "sqlite" alias driver
 	client2, err := NewClient(ctx, "sqlite", "file:db_test2?mode=memory&cache=shared&_pragma=foreign_keys(1)")
 	require.NoError(t, err)
-	defer client2.Close()
+	defer func() {
+		_ = client2.Close()
+	}()
 
 	// Unsupported driver error
 	_, err = NewClient(ctx, "unsupported_driver", "dsn")
-	assert.Error(t, err)
+	require.Error(t, err)
 }
