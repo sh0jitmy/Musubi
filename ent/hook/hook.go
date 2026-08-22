@@ -6,8 +6,104 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/shjtmy/go_sh0jitmy_template/ent"
+	"github.com/sh0jitmy/musubi/ent"
 )
+
+// The AuditLogFunc type is an adapter to allow the use of ordinary
+// function as AuditLog mutator.
+type AuditLogFunc func(context.Context, *ent.AuditLogMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f AuditLogFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.AuditLogMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.AuditLogMutation", m)
+}
+
+// The CredentialProfileFunc type is an adapter to allow the use of ordinary
+// function as CredentialProfile mutator.
+type CredentialProfileFunc func(context.Context, *ent.CredentialProfileMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f CredentialProfileFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.CredentialProfileMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.CredentialProfileMutation", m)
+}
+
+// The JobFunc type is an adapter to allow the use of ordinary
+// function as Job mutator.
+type JobFunc func(context.Context, *ent.JobMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f JobFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.JobMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.JobMutation", m)
+}
+
+// The JobStepFunc type is an adapter to allow the use of ordinary
+// function as JobStep mutator.
+type JobStepFunc func(context.Context, *ent.JobStepMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f JobStepFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.JobStepMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.JobStepMutation", m)
+}
+
+// The ScenarioFunc type is an adapter to allow the use of ordinary
+// function as Scenario mutator.
+type ScenarioFunc func(context.Context, *ent.ScenarioMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f ScenarioFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.ScenarioMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ScenarioMutation", m)
+}
+
+// The ScenarioVersionFunc type is an adapter to allow the use of ordinary
+// function as ScenarioVersion mutator.
+type ScenarioVersionFunc func(context.Context, *ent.ScenarioVersionMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f ScenarioVersionFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.ScenarioVersionMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ScenarioVersionMutation", m)
+}
+
+// The StateTransitionLogFunc type is an adapter to allow the use of ordinary
+// function as StateTransitionLog mutator.
+type StateTransitionLogFunc func(context.Context, *ent.StateTransitionLogMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f StateTransitionLogFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.StateTransitionLogMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.StateTransitionLogMutation", m)
+}
+
+// The TargetFunc type is an adapter to allow the use of ordinary
+// function as Target mutator.
+type TargetFunc func(context.Context, *ent.TargetMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f TargetFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.TargetMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.TargetMutation", m)
+}
 
 // The UserFunc type is an adapter to allow the use of ordinary
 // function as User mutator.

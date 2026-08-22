@@ -34,16 +34,16 @@ GitHub Copilotは、PRのレビュー時またはコード編集時に、`.githu
 `.github/copilot-instructions.md` には、以下の本リポジトリ定義スキルの重要ルールを抽出して反映させます。
 
 1. **設計・アーキテクチャ (Design)**:
-   - **参照スキル**: [golang-design](file:///Users/shjtmy/gravity/claude_code_skills/.claude/skills/golang-design/SKILL.md) / [software-architecture](file:///Users/shjtmy/gravity/claude_code_skills/.claude/skills/software-architecture/SKILL.md)
+   - **参照スキル**: [golang-design](file:///Users/sh0jitmy/gravity/claude_code_skills/.claude/skills/golang-design/SKILL.md) / [software-architecture](file:///Users/sh0jitmy/gravity/claude_code_skills/.claude/skills/software-architecture/SKILL.md)
    - **反映項目**: 小さなインターフェース設計（メソッド1〜3個）、Accept interfaces, return structs、モジュラーモノリス境界の維持（モジュール間のテーブルJOIN禁止、内部パッケージの直接参照制限）。
 2. **セキュリティ・ライセンス (Security)**:
-   - **参照スキル**: [sre-deployment](file:///Users/shjtmy/gravity/claude_code_skills/.claude/skills/sre-deployment/SKILL.md)
+   - **参照スキル**: [sre-deployment](file:///Users/sh0jitmy/gravity/claude_code_skills/.claude/skills/sre-deployment/SKILL.md)
    - **反映項目**: APIキーやトークンのハードコード禁止（SOPS暗号化の適用）、通信時の適切なタイムアウト設定、ACMEキャッシュ考慮、コピーレフトライセンス（GPL, AGPL等）の排除。
 3. **テスト・品質 (Testing)**:
-   - **参照スキル**: [quality-inspector](file:///Users/shjtmy/gravity/claude_code_skills/.claude/skills/quality-inspector/SKILL.md) / [golang-e2e-testing](file:///Users/shjtmy/gravity/claude_code_skills/.claude/skills/golang-e2e-testing/SKILL.md)
+   - **参照スキル**: [quality-inspector](file:///Users/sh0jitmy/gravity/claude_code_skills/.claude/skills/quality-inspector/SKILL.md) / [golang-e2e-testing](file:///Users/sh0jitmy/gravity/claude_code_skills/.claude/skills/golang-e2e-testing/SKILL.md)
    - **反映項目**: 正常系・異常系・境界値テストの網羅性、Flakyテストの防止（時間の依存排除、データレース対策）、FMEA/FTAに基づく障害模擬テスト（自己修復・エラーマスク）の適合。
 4. **オブザーバビリティ (Observability)**:
-   - **参照スキル**: [golang-observability](file:///Users/shjtmy/gravity/claude_code_skills/.claude/skills/golang-observability/SKILL.md)
+   - **参照スキル**: [golang-observability](file:///Users/sh0jitmy/gravity/claude_code_skills/.claude/skills/golang-observability/SKILL.md)
    - **反映項目**: slogを用いた構造化ログ（キー・バリュー形式）、適切なログレベルの選定、機密情報のマスキング、Prometheusメトリクス（USE/REDメソッド）、トレース境界でのエラー記録。
 
 ## 3. レビュー結果の完全日本語化の指定

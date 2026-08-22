@@ -106,7 +106,7 @@ Makefile に定義されている以下のコマンドを使用して開発を�
 本リポジトリは **Apache License 2.0** でライセンスされています。複製して使用する際は、以下の項目をご自身の情報にカスタマイズしてご利用ください。
 
 ### 1. LICENSE ファイルの更新
-リポジトリルートにある [LICENSE](file:///Users/shjtmy/gravity/go_sh0jitmy_template/LICENSE) ファイル内の `[Copyright Holder]` 部分をご自身の名称または組織名に書き換えてください。
+リポジトリルートにある [LICENSE](LICENSE) ファイル内の `[Copyright Holder]` 部分をご自身の名称または組織名に書き換えてください。
 
 ### 2. カスタムスキル (author) の一括置換
 同梱されている各カスタムスキル (`.claude/skills/*/SKILL.md`) のフロントマターに定義されている `author: [YOUR_NAME]` を、ご自身の名称に変更してください。

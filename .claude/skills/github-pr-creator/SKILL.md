@@ -61,7 +61,7 @@ allowed-tools: Read Edit Write Glob Grep Bash(git:*,gh:*) Agent AskUserQuestion
     - `make lint` や `make test` が正常に通過している場合（あるいはAI自身がタスクで実行した実績がある場合）、該当する検証項目の `[ ]` を `[x]` に書き換えます。
 
 ### Step 4: PRの作成実行
-- 生成したPRボディテキストを一時ファイル（例: `/Users/shjtmy/.gemini/antigravity-ide/brain/<conversation-id>/scratch/pr_body.md`）に書き込みます。
+- 生成したPRボディテキストを一時ファイル（例: `/Users/sh0jitmy/.gemini/antigravity-ide/brain/<conversation-id>/scratch/pr_body.md`）に書き込みます。
 - 以下のコマンドを提案し、ユーザーの承認を得た上で実行します（デフォルトは `--draft` 推奨ですが、ユーザー指示に準拠します）：
   ```bash
   bash scripts/create_pr.sh --title "PRタイトル" --body-file "/path/to/pr_body.md" --draft

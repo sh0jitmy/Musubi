@@ -47,7 +47,7 @@ graph TD
 
 ### 2.5 自己改善ループと人間承認 (Self-Evaluation & Sign-off)
 - **手続き**:
-  - プロジェクト側の要件適合率を `make self-eval` コマンドで集計し、[REQUIREMENTS.md](file:///Users/shjtmy/gravity/go_sh0jitmy_template/REQUIREMENTS.md) に適合率 100% のログを同期する。
+  - プロジェクト側の要件適合率を `make self-eval` コマンドで集計し、[REQUIREMENTS.md](../REQUIREMENTS.md) に適合率 100% のログを同期する。
   - 不適合（FAIL）項目が存在する場合、エージェントは自律的自己改善ループによりリファクタリングを繰り返す。
   - 最終的に、すべての監査・検査レポートを人間に提示し、**人間の直接確認と明示的な署名（Sign-off）を必須の完了条件**とする。
   - **スキル自体の自己改善手順 (AIエージェント向け実行ワークフロー)**:

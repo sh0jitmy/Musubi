@@ -36,7 +36,7 @@
 - **適用されたカスタムスキル**:
   - `golang-design`
 - **具体的な証跡**:
-  - [0001-go-template-repository-design.md](file:///Users/shjtmy/gravity/go_sh0jitmy_template/docs/adr/0001-go-template-repository-design.md) (ステータス: 承認済み (Accepted))
+  - [0001-go-template-repository-design.md](adr/0001-go-template-repository-design.md) (ステータス: 承認済み (Accepted))
 
 ### 2.2 実装・コード品質フェーズ (Implementation & Quality)
 - **検証結果**: **適合**
@@ -53,12 +53,12 @@
   - `database-design`
   - `golang-observability`
 - **具体的な証跡**:
-  - [main.go](file:///Users/shjtmy/gravity/go_sh0jitmy_template/cmd/app/main.go)
-  - [db.go](file:///Users/shjtmy/gravity/go_sh0jitmy_template/internal/database/db.go)
-  - [handler.go](file:///Users/shjtmy/gravity/go_sh0jitmy_template/internal/api/handler.go)
-  - [middleware.go](file:///Users/shjtmy/gravity/go_sh0jitmy_template/internal/api/middleware.go)
-  - [server.go](file:///Users/shjtmy/gravity/go_sh0jitmy_template/internal/api/server.go)
-  - [check_license.py](file:///Users/shjtmy/gravity/go_sh0jitmy_template/scripts/check_license.py)
+  - `cmd/app/main.go`
+  - `internal/database/db.go`
+  - `internal/api/handler.go`
+  - `internal/api/middleware.go`
+  - `internal/api/server.go`
+  - `scripts/check_license.py`
 
 ### 2.3 テスト・E2Eフェーズ (Testing & E2E Verification)
 - **検証結果**: **適合**
@@ -68,7 +68,7 @@
 - **適用されたカスタムスキル**:
   - `golang-e2e-testing`
 - **具体的な証跡**:
-  - [main_test.go](file:///Users/shjtmy/gravity/go_sh0jitmy_template/cmd/app/main_test.go)
+  - `cmd/app/main_test.go`
 
 ### 2.4 CI/CD統合フェーズ (CI/CD Integration)
 - **検証結果**: **適合**
@@ -76,9 +76,9 @@
   - PR/マージ時/タグプッシュ時の自動ワークフローの整備。
   - `make generate` からの差分チェック（`git diff --exit-code`）による自動生成コードの不一致防止。
 - **具体的な証跡**:
-  - [.github/workflows/ci.yml](file:///Users/shjtmy/gravity/go_sh0jitmy_template/.github/workflows/ci.yml)
-  - [.github/workflows/tagpr.yml](file:///Users/shjtmy/gravity/go_sh0jitmy_template/.github/workflows/tagpr.yml)
-  - [.github/workflows/goreleaser.yml](file:///Users/shjtmy/gravity/go_sh0jitmy_template/.github/workflows/goreleaser.yml)
+  - `.github/workflows/ci.yml`
+  - `.github/workflows/tagpr.yml`
+  - `.github/workflows/goreleaser.yml`
 
 ### 2.5 ガバナンス・評価フェーズ (Governance & Evaluation)
 - **検証結果**: **適合**
@@ -86,8 +86,8 @@
   - `make self-eval` による自己評価適合率の同期。
   - 判定はすべて適合であり、7者のペルソナレビューを `docs/audit_report.md` に蓄積。
 - **具体的な証跡**:
-  - [REQUIREMENTS.md](file:///Users/shjtmy/gravity/go_sh0jitmy_template/REQUIREMENTS.md) (適合率: 100.00 %)
-  - [audit_report.md](file:///Users/shjtmy/gravity/go_sh0jitmy_template/docs/audit_report.md)
+  - [REQUIREMENTS.md](../REQUIREMENTS.md) (適合率: 100.00 %)
+  - [audit_report.md](audit_report.md)
 
 ---
 
@@ -95,9 +95,7 @@
 これまでのプロセス審査およびユーザーから指摘された主要事項（Goバージョンの見直し、ライセンスヘッダーの自動化、OpenAPI駆動コード生成、ent + CGO-free SQLite、Atlasマイグレーション、およびCI生成コードの不一致検査など）と、それに対応したリファクタリング内容の詳細は以下の通りです。
 
 - **ロール別専門レビュー指摘と合格判定理由の詳細**:
-  - [開発テンプレート監査レポート (audit_report.md)](file:///Users/shjtmy/gravity/go_sh0jitmy_template/docs/audit_report.md) を参照。
-- **自己改善およびリファクタリング履歴の全体像**:
-  - [ウォークスルー (walkthrough.md)](file:///Users/shjtmy/.gemini/antigravity-ide/brain/fdd7b579-3e76-4ad7-8eea-2923b5c6400e/walkthrough.md) を参照。
+  - [開発テンプレート監査レポート (audit_report.md)](audit_report.md) を参照。
 
 ---
 
@@ -106,24 +104,24 @@
 
 | 要件ID | 要件名称 | プロセス適合性検証結果 | 証跡ファイル |
 | :--- | :--- | :--- | :--- |
-| **R-1.1** | モジュール名のカスタマイズ | 適合。Go 1.25/1.26 の指定と go.mod 名の変更。 | [go.mod](file:///Users/shjtmy/gravity/go_sh0jitmy_template/go.mod) |
-| **R-1.2** | GitHub Actions 権限設定 | 適合。Workflow permissions の説明をREADMEに記載。 | [README.md](file:///Users/shjtmy/gravity/go_sh0jitmy_template/README.md) |
-| **R-2.1** | セキュアロギング | 適合。`SecureJSONHandler` で機密項目を `[REDACTED]` マスク。 | [handler.go](file:///Users/shjtmy/gravity/go_sh0jitmy_template/internal/api/handler.go) |
+| **R-1.1** | モジュール名のカスタマイズ | 適合。Go 1.25/1.26 の指定と go.mod 名の変更。 | `go.mod` |
+| **R-1.2** | GitHub Actions 権限設定 | 適合。Workflow permissions の説明をREADMEに記載。 | `README.md` |
+| **R-2.1** | セキュアロギング | 適合。`SecureJSONHandler` で機密項目を `[REDACTED]` マスク。 | `internal/api/handler.go` |
 | **R-2.2** | 静的解析のクリア | 適合。`make lint` での警告検知ゼロ。 | CI パイプライン実行結果 |
 | **R-2.3** | 脆弱性診断のクリア | 適合。`make vulncheck` によるゼロ件検出。 | CI パイプライン実行結果 |
 | **R-2.4** | テストとビルドの保証 | 適合。`make test` / `make build` の全パス。 | CI パイプライン実行結果 |
-| **R-2.5** | 自動リリースの統合 | 適合。`tagpr` と `GoReleaser` のワークフロー定義。 | [.github/workflows/](file:///Users/shjtmy/gravity/go_sh0jitmy_template/.github/workflows/) |
-| **R-2.6** | 単体テスト(UT)の網羅 | 適合。テスト対象関数へのUT実装。 | [main_test.go](file:///Users/shjtmy/gravity/go_sh0jitmy_template/cmd/app/main_test.go) |
-| **R-2.7** | テスト品質の自動検証 | 適合。`goleak` メモリリーク検出とテスト品質リンターの有効化。 | [main_test.go](file:///Users/shjtmy/gravity/go_sh0jitmy_template/cmd/app/main_test.go) |
-| **R-2.8** | ライセンス＆作成者ヘッダー監査 | 適合。`Makefile` および `check_license.py` で自動監査・付与。 | [check_license.py](file:///Users/shjtmy/gravity/go_sh0jitmy_template/scripts/check_license.py) |
-| **R-2.9** | E2Eテストの実装 | 適合。モックを使用しないインメモリDBを使用した結合E2E。 | [main_test.go](file:///Users/shjtmy/gravity/go_sh0jitmy_template/cmd/app/main_test.go) |
-| **R-2.10** | OpenAPI 駆動開発の準拠 | 適合。`openapi.yaml` と `oapi-codegen` 設定、および CI 差分監査。 | [api/](file:///Users/shjtmy/gravity/go_sh0jitmy_template/api/) |
-| **R-2.11** | データベースアクセス | 適合。`ent` ORM と CGO-free な SQLite の統合。 | [db.go](file:///Users/shjtmy/gravity/go_sh0jitmy_template/internal/database/db.go) |
-| **R-2.12** | Bearer 認証ミドルウェア | 適合。`Authorization: Bearer` 認証ゲートウェイ。 | [middleware.go](file:///Users/shjtmy/gravity/go_sh0jitmy_template/internal/api/middleware.go) |
-| **R-2.13** | HTTPS & 自動証明書更新 | 適合。`autocert` の統合と HSTS、HTTPリダイレクト。 | [main.go](file:///Users/shjtmy/gravity/go_sh0jitmy_template/cmd/app/main.go) |
-| **R-2.14** | OTel ログ戦略と監査ログ分離 | 適合。相関トレースID/スパンIDの自動付与および `log_type: "audit"` での監査証跡分離。 | [handler.go](file:///Users/shjtmy/gravity/go_sh0jitmy_template/internal/api/handler.go) |
-| **R-2.15** | OTel メトリクス計装 | 適合。OTel Metrics API を用いた HTTP リクエスト数・処理遅延の計装と Prometheus Exporter 公開。 | [middleware.go](file:///Users/shjtmy/gravity/go_sh0jitmy_template/internal/api/middleware.go)<br>[server.go](file:///Users/shjtmy/gravity/go_sh0jitmy_template/internal/api/server.go) |
-| **R-2.16** | 安全な pprof プロファイリング | 適合。外部公開を防ぎ `127.0.0.1:6060` (localhostのみ) にバインドした安全な有効化。 | [main.go](file:///Users/shjtmy/gravity/go_sh0jitmy_template/cmd/app/main.go) |
+| **R-2.5** | 自動リリースの統合 | 適合。`tagpr` と `GoReleaser` のワークフロー定義。 | `.github/workflows/` |
+| **R-2.6** | 単体テスト(UT)の網羅 | 適合。テスト対象関数へのUT実装。 | `cmd/app/main_test.go` |
+| **R-2.7** | テスト品質の自動検証 | 適合。`goleak` メモリリーク検出とテスト品質リンターの有効化。 | `cmd/app/main_test.go` |
+| **R-2.8** | ライセンス＆作成者ヘッダー監査 | 適合。`Makefile` および `check_license.py` で自動監査・付与。 | `scripts/check_license.py` |
+| **R-2.9** | E2Eテストの実装 | 適合。モックを使用しないインメモリDBを使用した結合E2E。 | `cmd/app/main_test.go` |
+| **R-2.10** | OpenAPI 駆動開発の準拠 | 適合。`openapi.yaml` と `oapi-codegen` 設定、および CI 差分監査。 | `api/` |
+| **R-2.11** | データベースアクセス | 適合。`ent` ORM と CGO-free な SQLite の統合。 | `internal/database/db.go` |
+| **R-2.12** | Bearer 認証ミドルウェア | 適合。`Authorization: Bearer` 認証ゲートウェイ。 | `internal/api/middleware.go` |
+| **R-2.13** | HTTPS & 自動証明書更新 | 適合。`autocert` の統合と HSTS、HTTPリダイレクト。 | `cmd/app/main.go` |
+| **R-2.14** | OTel ログ戦略と監査ログ分離 | 適合。相関トレースID/スパンIDの自動付与および `log_type: "audit"` での監査証跡分離。 | `internal/api/handler.go` |
+| **R-2.15** | OTel メトリクス計装 | 適合。OTel Metrics API を用いた HTTP リクエスト数・処理遅延の計装と Prometheus Exporter 公開。 | `internal/api/middleware.go`<br>`internal/api/server.go` |
+| **R-2.16** | 安全な pprof プロファイリング | 適合。外部公開を防ぎ `127.0.0.1:6060` (localhostのみ) にバインドした安全な有効化。 | `cmd/app/main.go` |
 
 ---
 

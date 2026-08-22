@@ -22,7 +22,7 @@ metadata:
 実装や設定の変更、テスト追加、CI/CD統合の作業が発生する都度、監査証跡マネージャーとして以下のステップを実行しなければなりません。
 
 1. **設計・着手時点 (ADRチェック)**:
-   - 変更の意思決定が [ADR (Architecture Decision Record)](file:///Users/shjtmy/gravity/claude_code_skills/docs/adr/) としてドキュメント化されているかを確認し、リンクを収集。
+   - 変更の意思決定が [ADR (Architecture Decision Record)](file:///Users/sh0jitmy/gravity/claude_code_skills/docs/adr/) としてドキュメント化されているかを確認し、リンクを収集。
 2. **実装・テスト完了時点 (検証ログチェック)**:
    - ローカルでのテスト実行結果（テスト件数、PASS判定など）のログを取得。
    - データベース（モック等含む）および並行処理のテストカバレッジが確保されているかを検証。
@@ -30,7 +30,7 @@ metadata:
    - CI/CD設定ファイル（GitHub Actions等）において、すべてのテストターゲットが網羅されているかを確認。
    - パイプライン内で実行されるツールが許容的オープンソースライセンス（Apache-2.0, MIT, BSD等）に合致し、コピーレフトツールが排除されているかを確認。
 4. **監査レポートおよび成果物の更新 (ドキュメントチェック)**:
-   - [監査レポート](file:///Users/shjtmy/gravity/claude_code_skills/docs/audit_report.md) および [ウォークスルー](file:///Users/shjtmy/.gemini/antigravity/brain/eb4e4219-80d8-444b-bfb0-ab664c85a4e5/walkthrough.md) を更新。5者のペルソナによるレビュー結果（判定妥当性理由のコメント含む）が都度最新化されているかを確認。
+   - [監査レポート](file:///Users/sh0jitmy/gravity/claude_code_skills/docs/audit_report.md) および [ウォークスルー](file:///Users/sh0jitmy/.gemini/antigravity/brain/eb4e4219-80d8-444b-bfb0-ab664c85a4e5/walkthrough.md) を更新。5者のペルソナによるレビュー結果（判定妥当性理由のコメント含む）が都度最新化されているかを確認。
 5. **日本語化のチェック (品質チェック)**:
    - 出力されるドキュメント、ソースコードコメント、思考ログ、およびレポートが完全に日本語（100%）で記述されていることを検証。
 

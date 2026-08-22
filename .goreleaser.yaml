@@ -1,5 +1,5 @@
 version: 2
-project_name: go_sh0jitmy_template
+project_name:  musubi
 
 before:
   hooks:

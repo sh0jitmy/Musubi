@@ -27,8 +27,8 @@ import (
 	entsql "entgo.io/ent/dialect/sql"
 	sqlite "github.com/glebarez/go-sqlite"
 	_ "github.com/jackc/pgx/v5/stdlib"
-	"github.com/shjtmy/go_sh0jitmy_template/ent"
-	"github.com/shjtmy/go_sh0jitmy_template/ent/user"
+	"github.com/sh0jitmy/musubi/ent"
+	"github.com/sh0jitmy/musubi/ent/user"
 	"golang.org/x/crypto/bcrypt"
 )
 

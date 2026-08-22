@@ -16,7 +16,7 @@
 
 # 組織カスタムスキルによる開発テンプレート監査レポート
 
-本レポートは、`/Users/shjtmy/gravity/go_sh0jitmy_template/` に配置された Go 開発用テンプレートリポジトリのソースコードおよび CI/CD パイプライン設定に対し、定義された日本語カスタムスキル（`database-design`, `golang-*`, `software-architecture`）を適用した監査レビュー結果です。
+本レポートは、本リポジトリのソースコードおよび CI/CD パイプライン設定に対し、定義された日本語カスタムスキル（`database-design`, `golang-*`, `software-architecture`）を適用した監査レビュー結果です。
 
 レビューは、**Goソフトウェアアーキテクト**、**SRE（Site Reliability Engineer）**、**DBエキスパート（Database Expert）**、**ネットワークエンジニア**、**AIエンジニア**、**QAエンジニア**、**SIRT（セキュリティ）監査員**の7者のペルソナに基づいて実施されました。
 
