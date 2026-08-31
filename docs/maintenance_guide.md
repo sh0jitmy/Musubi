@@ -144,6 +144,18 @@ API エラーはすべて **RFC 7807 (Problem Details for HTTP APIs)** に準拠
   - 単体テストではインメモリ SQLite (`file:test?mode=memory&cache=shared&_pragma=foreign_keys(1)`)、E2E/本番環境では PostgreSQL を使用します。
   - RDBMS 依存の生 SQL を書かず、Ent の型安全クエリビルダを使用してください。
 
+### 4.3 ログリテンション & In-Process Cleaner Worker の設計
+- **マルチプラットフォーム自律動作**:
+  - Linux `crontab` や OS 固有のスケジューラに依存せず、Go プロセス内の `time.Ticker` による非同期 Goroutine (`internal/database/cleaner.go:StartBackgroundCleaner`) で動作します。
+  - Windows, macOS, Linux, コンテナ環境のいずれでも単一バイナリで自律的にログパージが機能します。
+- **対象テーブル**:
+  - `state_transition_logs` (状態変更履歴)
+  - `jobs` (完了・失敗した過去ジョブ)
+  - `audit_logs` (管理・操作監査ログ)
+- **手動パージと API**:
+  - CLI: `musubi-cli maintenance purge --days <N>`
+  - API: `POST /v1/system/purge` (`{"days": 30}`)
+
 ---
 
 ## 5. 開発・テスト・検証コマンド集
@@ -165,7 +177,7 @@ bash scripts/check_coverage.sh
 
 ### 5.2 Docker Compose & E2E / Grafana 検証
 ```bash
-# PostgreSQL, Prometheus, Grafana, Mock Agent を含むフルスタック起動
+# PostgreSQL, VictoriaMetrics, Grafana, Mock Agent を含むフルスタック起動
 docker compose -f deploy/docker-compose.yml up -d --build
 
 # 起動確認 (API Healthz)
@@ -173,6 +185,17 @@ curl http://localhost:8080/v1/system/healthz
 
 # Grafana ダッシュボード表示確認
 open http://localhost:3000   # (admin / admin)
+```
+
+### 5.3 SNMP シナリオ E2E パケットキャプチャ (PCAP) 検証
+```bash
+# Bulk-Get -> SET -> Inform-Request -> ACK の E2E 実行と PCAP 生成
+make pcap-verify
+# または
+python3 scripts/verify_snmp_pcap_flow.py
+
+# キャプチャファイルのパケット構造解析
+tcpdump -r test_reports/snmp_scenario_flow.pcap -nn -X
 ```
 
 ---
@@ -184,29 +207,37 @@ Musubi/
 ├── api/
 │   └── openapi.yaml                 # OpenAPI 3.0 API 定義仕様書
 ├── cmd/
-│   ├── musubi-server/               # Musubi メインサーバー起動エントリポイント
-│   ├── musubi-cli/                  # 管理用 CLI ツール
-│   └── mock-snmp-agent/             # SNMP 擬似エージェント (テスト・デモ用)
+│   ├── musubi-server/               # Musubi メインサーバー起動エントリポイント (In-Process Cleaner, Trap Listener 統合)
+│   ├── musubi-cli/                  # 管理用 CLI ツール (maintenance purge, backup, targets, scenarios)
+│   └── mock-snmp-agent/             # SNMP 擬似エージェント (GET, SET, Bulk-Get, Inform-Request 送信対応)
 ├── deploy/
-│   ├── docker-compose.yml           # E2E・デモ用 Docker Compose 定義
+│   ├── docker-compose.yml           # E2E・デモ用 Docker Compose 定義 (ログローテーション, TSDBリテンション設定済)
 │   ├── prometheus/                  # Prometheus 収集設定 (scrape_configs)
 │   └── grafana/
 │       ├── dashboards/
-│       │   └── musubi_overview.json # CPU/メモリ/帯域/MIBテーブル監視ダッシュボード
+│       │   └── musubi_overview.json # 対話型フィルタ・2000件ページネーション対応ダッシュボード
 │       └── provisioning/            # ダッシュボード・データソース自動プロビジョニング
 ├── docs/
 │   ├── architecture.md              # 詳細アーキテクチャ設計書
-│   └── maintenance_guide.md         # 本保守・開発・バグ修正ガイド
+│   ├── maintenance_guide.md         # 本保守・開発・バグ修正ガイド
+│   └── user_manual.md               # ユーザーマニュアル
 ├── ent/                             # Ent ORM 自動生成コード & スキーマ定義
 │   └── schema/                      # Target, Scenario, Job, Credential 等のスキーマ
 ├── internal/
-│   ├── collector/                   # SNMP クライアント & UDP Trap リスナー
+│   ├── collector/                   # SNMP クライアント (BulkGet対応) & UDP Trap/Inform リスナー (RFC 3416 ACK対応)
 │   ├── common/                      # 共通モジュール (バッチャ, リースロック, ハブ, メトリクス, エラー)
-│   ├── database/                    # Ent クライアント初期化 & マイグレーション
-│   ├── gateway/                     # REST API ルーター, ハンドラ, RFC 7807 変換
-│   ├── orchestrator/                # シナリオ DSL 実行エンジン & 孤立シナリオ検知
+│   ├── database/                    # Ent クライアント初期化 & In-Process Cleaner Worker
+│   ├── gateway/                     # REST API ルーター, ハンドラ, RFC 7807 変換, /v1/system/purge
+│   ├── orchestrator/                # シナリオ DSL 実行エンジン (Bulk-Get, SET, wait.until), PCAP Capture テスト
 │   ├── state/                       # 2-Tier 状態リポジトリ & Google CEL 評価器
-│   └── testutil/snmpmock/           # テスト用 SNMP モックエージェント
-└── scripts/
-    └── check_coverage.sh            # カバレッジ自動検証スクリプト (>= 80%)
+│   └── testutil/snmpmock/           # テスト用 SNMP モックエージェント (Bulk-Get, SET, Inform-Request)
+├── scripts/
+│   ├── check_coverage.sh            # カバレッジ自動検証スクリプト (>= 80%)
+│   ├── demo.sh                      # フルスタックライブデモスクリプト
+│   ├── docker_e2e.sh                # Docker E2E テストスイート
+│   ├── test_grafana_ui.py           # Grafana UI 自動検証スクリプト
+│   └── verify_snmp_pcap_flow.py     # SNMP シナリオ PCAP パケット検証スクリプト
+└── test_reports/
+    └── snmp_scenario_flow.pcap      # 生成された標準 libpcap 2.4 キャプチャファイル
 ```
+

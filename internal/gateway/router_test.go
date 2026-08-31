@@ -20,9 +20,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	_ "github.com/glebarez/go-sqlite"
 	"github.com/sh0jitmy/musubi/internal/common/notification"
@@ -476,4 +478,61 @@ func TestGateway_ValidationAndErrorPaths(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 	server.Engine.ServeHTTP(w, req)
 	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+func TestGateway_SystemPurgeAndEvents(t *testing.T) {
+	t.Parallel()
+	server := setupTestServer(t, "gw_purge_events")
+
+	// 1. Test POST /v1/system/purge
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest(http.MethodPost, "/v1/system/purge", bytes.NewReader([]byte(`{"days": 30}`)))
+	req.Header.Set("Content-Type", "application/json")
+	server.Engine.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	// 2. Test GET /v1/events/poll
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest(http.MethodGet, "/v1/events/poll?since=0&timeout=50ms", nil)
+	server.Engine.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	// 3. Test GET /v1/events/stream with context cancel
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequestWithContext(ctx, http.MethodGet, "/v1/events/stream", nil)
+	server.Engine.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	// 4. Test TargetProviderAdapter
+	// Create credential profile & target
+	w = httptest.NewRecorder()
+	//nolint:gosec // mock test credentials
+	credBody := `{"name": "test-cred-v2", "version": "v2c", "community": "public"}`
+	req, _ = http.NewRequest(http.MethodPost, "/v1/credentials", bytes.NewReader([]byte(credBody)))
+	req.Header.Set("Content-Type", "application/json")
+	server.Engine.ServeHTTP(w, req)
+	require.Equal(t, http.StatusCreated, w.Code)
+
+	var credResp struct {
+		ID string `json:"id"`
+	}
+	_ = json.Unmarshal(w.Body.Bytes(), &credResp)
+
+	w = httptest.NewRecorder()
+	targetBody := fmt.Sprintf(`{"name": "test-gw-target", "host": "127.0.0.1", "port": 161, "credential_id": "%s"}`, credResp.ID)
+	req, _ = http.NewRequest(http.MethodPost, "/v1/targets", bytes.NewReader([]byte(targetBody)))
+	req.Header.Set("Content-Type", "application/json")
+	server.Engine.ServeHTTP(w, req)
+	require.Equal(t, http.StatusCreated, w.Code)
+
+	adapter := &gateway.TargetProviderAdapter{Client: server.EntClient}
+	targetInfo, err := adapter.GetTarget(context.Background(), "test-gw-target")
+	require.NoError(t, err)
+	assert.Equal(t, "test-gw-target", targetInfo.Name)
+
+	snmpCli, err := adapter.GetSNMPClient(context.Background(), "test-gw-target")
+	require.NoError(t, err)
+	assert.NotNil(t, snmpCli)
 }

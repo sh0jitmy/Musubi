@@ -1,5 +1,11 @@
 name: musubi-stack
 
+x-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   musubi-server:
     build:
@@ -14,6 +20,8 @@ services:
       - PORT=8080
       - DATABASE_DRIVER=postgres
       - DATABASE_DSN=postgres://musubi:musubi_secret@postgres:5432/musubi?sslmode=disable
+      - RETENTION_INTERVAL_HOURS=24
+      - RETENTION_DAYS=30
     depends_on:
       postgres:
         condition: service_healthy
@@ -24,6 +32,7 @@ services:
       retries: 5
     networks:
       - musubi-net
+    logging: *default-logging
 
   postgres:
     image: postgres:16-alpine
@@ -44,6 +53,7 @@ services:
       retries: 5
     networks:
       - musubi-net
+    logging: *default-logging
 
   victoriametrics:
     image: victoriametrics/victoria-metrics:v1.99.0
@@ -58,8 +68,10 @@ services:
       - "-promscrape.config=/etc/prometheus.yml"
       - "-promscrape.config.strictParse=false"
       - "-storageDataPath=/victoria-metrics-data"
+      - "-retentionPeriod=1"
     networks:
       - musubi-net
+    logging: *default-logging
 
   grafana:
     image: grafana/grafana:10.4.0
@@ -81,6 +93,7 @@ services:
       - postgres
     networks:
       - musubi-net
+    logging: *default-logging
 
   mock-snmp-agent:
     build:
@@ -96,6 +109,7 @@ services:
       - TRAP_TARGET=musubi-server:162
     networks:
       - musubi-net
+    logging: *default-logging
 
 volumes:
   pgdata:

@@ -17,10 +17,13 @@
 package collector
 
 import (
+	"net"
+	"strconv"
 	"testing"
 	"time"
 
 	"github.com/gosnmp/gosnmp"
+	"github.com/sh0jitmy/musubi/internal/testutil/snmpmock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
@@ -195,7 +198,85 @@ func TestSNMP_ErrorPaths(t *testing.T) {
 	_, err = cli.Get([]string{".1.3.6.1.2.1.1.1.0"})
 	require.Error(t, err)
 
+	// Connection failure BulkGet
+	_, err = cli.BulkGet([]string{".1.3.6.1.2.1.2.2.1"}, 0, 5)
+	require.Error(t, err)
+
 	// Connection failure Set
 	err = cli.Set(".1.3.6.1.2.1.1.1.0", "string", "newval")
 	require.Error(t, err)
+}
+
+func TestSNMP_ClientAndListener_Integration(t *testing.T) {
+	t.Parallel()
+
+	// 1. Setup Mock Agent
+	agent := snmpmock.NewMockAgent(map[string]any{
+		".1.3.6.1.2.1.1.1.0":     "Integration-Router",
+		".1.3.6.1.2.1.2.2.1.7.1": 1,
+		".1.3.6.1.2.1.2.2.1.8.1": 1,
+	})
+	agentAddr, err := agent.Start()
+	require.NoError(t, err)
+	defer agent.Stop()
+
+	host, portStr, err := net.SplitHostPort(agentAddr)
+	require.NoError(t, err)
+	p64, err := strconv.ParseUint(portStr, 10, 16)
+	require.NoError(t, err)
+	p := uint16(p64)
+
+	cli := NewClient(SNMPConfig{
+		Host:      host,
+		Port:      p,
+		Version:   "v2c",
+		Community: "public",
+		Timeout:   1 * time.Second,
+	})
+
+	// 2. Test Get
+	getRes, err := cli.Get([]string{".1.3.6.1.2.1.1.1.0"})
+	require.NoError(t, err)
+	assert.Equal(t, "Integration-Router", getRes[".1.3.6.1.2.1.1.1.0"])
+
+	// 3. Test BulkGet
+	bulkRes, err := cli.BulkGet([]string{".1.3.6.1.2.1.2.2.1"}, 0, 5)
+	require.NoError(t, err)
+	assert.NotEmpty(t, bulkRes)
+
+	// 3.5 Test BulkWalk
+	walkRes, err := cli.BulkWalk(".1.3.6.1.2.1.2.2.1")
+	require.NoError(t, err)
+	assert.NotEmpty(t, walkRes)
+
+	// 4. Test Set
+	err = cli.Set(".1.3.6.1.2.1.2.2.1.7.1", "int", 2)
+	require.NoError(t, err)
+
+	// 5. Test Listener receiving Inform
+	received := make(chan bool, 1)
+	listener := NewListener("127.0.0.1:18163", func(target string, oid string, val any, trigger string) {
+		if trigger == "INFORM" {
+			select {
+			case received <- true:
+			default:
+			}
+		}
+	})
+	err = listener.Start()
+	require.NoError(t, err)
+	defer listener.Stop()
+
+	// Send Inform to listener
+	err = agent.SendInform("127.0.0.1:18163", []gosnmp.SnmpPDU{
+		{Name: ".1.3.6.1.2.1.2.2.1.8.1", Type: gosnmp.Integer, Value: 2},
+	})
+	require.NoError(t, err)
+
+	select {
+	case <-received:
+		// Success
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for Inform packet")
+	}
 }

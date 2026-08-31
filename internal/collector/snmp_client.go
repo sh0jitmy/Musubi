@@ -131,6 +131,56 @@ func (c *Client) Get(oids []string) (map[string]any, error) {
 	return resMap, nil
 }
 
+// BulkGet performs an SNMP GETBULK for given OIDs with nonRepeaters and maxRepetitions
+func (c *Client) BulkGet(oids []string, nonRepeaters uint8, maxRepetitions uint32) (map[string]any, error) {
+	snmp, err := c.buildGoSNMP()
+	if err != nil {
+		return nil, err
+	}
+	if connErr := snmp.Connect(); connErr != nil {
+		return nil, fmt.Errorf("snmp connect failed: %w", connErr)
+	}
+	defer func() {
+		_ = snmp.Conn.Close()
+	}()
+
+	result, err := snmp.GetBulk(oids, nonRepeaters, maxRepetitions)
+	if err != nil {
+		return nil, fmt.Errorf("snmp bulk get failed: %w", err)
+	}
+
+	resMap := make(map[string]any)
+	for _, v := range result.Variables {
+		resMap[v.Name] = parsePduValue(v)
+	}
+	return resMap, nil
+}
+
+// BulkWalk performs an SNMP BulkWalk for the given root OID and collects all sub-tree variables
+func (c *Client) BulkWalk(rootOid string) (map[string]any, error) {
+	snmp, err := c.buildGoSNMP()
+	if err != nil {
+		return nil, err
+	}
+	snmp.MaxRepetitions = 50
+	if connErr := snmp.Connect(); connErr != nil {
+		return nil, fmt.Errorf("snmp connect failed: %w", connErr)
+	}
+	defer func() {
+		_ = snmp.Conn.Close()
+	}()
+
+	resMap := make(map[string]any)
+	err = snmp.BulkWalk(rootOid, func(pdu gosnmp.SnmpPDU) error {
+		resMap[pdu.Name] = parsePduValue(pdu)
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("snmp bulk walk failed: %w", err)
+	}
+	return resMap, nil
+}
+
 // Set performs an SNMP SET on an OID
 func (c *Client) Set(oid string, typeStr string, val any) error {
 	snmp, err := c.buildGoSNMP()

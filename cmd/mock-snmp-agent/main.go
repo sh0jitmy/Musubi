@@ -18,107 +18,64 @@ package main
 
 import (
 	"log"
-	"net"
 	"os"
 	"os/signal"
 	"strconv"
 	"syscall"
-	"time"
 
 	"github.com/gosnmp/gosnmp"
+	"github.com/sh0jitmy/musubi/internal/testutil/snmpmock"
 )
 
 func main() {
-	port := os.Getenv("SNMP_PORT")
-	if port == "" {
-		port = "161"
+	portStr := os.Getenv("SNMP_PORT")
+	if portStr == "" {
+		portStr = "161"
 	}
+	port, _ := strconv.Atoi(portStr)
 
 	trapTarget := os.Getenv("TRAP_TARGET")
 	if trapTarget == "" {
 		trapTarget = "musubi-server:162"
 	}
 
-	addr, err := net.ResolveUDPAddr("udp", ":"+port)
+	agent := snmpmock.NewMockAgent(map[string]any{
+		".1.3.6.1.2.1.1.1.0":     "Musubi-Mock-Switch-24G",
+		".1.3.6.1.2.1.1.5.0":     "spine1.datacenter.local",
+		".1.3.6.1.2.1.2.2.1.1.1": 1,
+		".1.3.6.1.2.1.2.2.1.2.1": "GigabitEthernet0/1",
+		".1.3.6.1.2.1.2.2.1.7.1": 1, // AdminStatus = up (1)
+		".1.3.6.1.2.1.2.2.1.8.1": 1, // OperStatus = up (1)
+		".1.3.6.1.2.1.2.2.1.1.2": 2,
+		".1.3.6.1.2.1.2.2.1.2.2": "GigabitEthernet0/2",
+		".1.3.6.1.2.1.2.2.1.7.2": 1,
+		".1.3.6.1.2.1.2.2.1.8.2": 1,
+	})
+	agent.SetTrapTarget(trapTarget)
+
+	addr, err := agent.Start()
 	if err != nil {
-		log.Fatalf("Failed to resolve UDP address: %v", err)
+		log.Fatalf("Failed to start mock agent: %v", err)
 	}
 
-	conn, err := net.ListenUDP("udp", addr)
-	if err != nil {
-		//nolint:gosec // mock test agent env log
-		log.Fatalf("Failed to listen on UDP port %v: %v", port, err)
-	}
-	defer func() {
-		_ = conn.Close()
-	}()
+	//nolint:gosec // log injection not applicable for local port
+	log.Printf("Mock SNMP Agent listening on UDP port %d (%s), trap target: %s", port, addr, trapTarget)
 
-	//nolint:gosec // mock test agent env log
-	log.Printf("Mock SNMP Agent listening on UDP port %v (trap target: %v)", port, trapTarget)
-
-	// Send periodic test Traps/Informs if requested
+	// Send initial boot Trap
 	go func() {
-		ticker := time.NewTicker(10 * time.Second)
-		defer ticker.Stop()
-
-		for range ticker.C {
-			sendMockTrap(trapTarget)
-		}
+		_ = agent.SendTrap(trapTarget, ".1.3.6.1.2.1.2.2.1.8.1", []gosnmp.SnmpPDU{
+			{
+				Name:  ".1.3.6.1.2.1.2.2.1.8.1",
+				Type:  gosnmp.Integer,
+				Value: 1,
+			},
+		})
 	}()
 
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 
-	buf := make([]byte, 4096)
-	go func() {
-		for {
-			_, _, err := conn.ReadFrom(buf)
-			if err != nil {
-				return
-			}
-		}
-	}()
-
 	<-sigChan
+	agent.Stop()
 	log.Println("Shutting down Mock SNMP Agent...")
-}
-
-func sendMockTrap(targetAddr string) {
-	host, portStr, err := net.SplitHostPort(targetAddr)
-	if err != nil {
-		host = "127.0.0.1"
-		portStr = "162"
-	}
-
-	var port uint16 = 162
-	if p, err := strconv.ParseUint(portStr, 10, 16); err == nil {
-		port = uint16(p)
-	}
-
-	snmp := &gosnmp.GoSNMP{
-		Target:    host,
-		Port:      port,
-		Version:   gosnmp.Version2c,
-		Community: "public",
-		Timeout:   1 * time.Second,
-	}
-
-	if connErr := snmp.Connect(); connErr != nil {
-		return
-	}
-	defer func() {
-		_ = snmp.Conn.Close()
-	}()
-
-	trap := gosnmp.SnmpTrap{
-		Variables: []gosnmp.SnmpPDU{
-			{
-				Name:  ".1.3.6.1.2.1.2.2.1.8.1", // IF-MIB::ifOperStatus.1
-				Type:  gosnmp.Integer,
-				Value: 1, // up
-			},
-		},
-	}
-
-	_, _ = snmp.SendTrap(trap)
 }
