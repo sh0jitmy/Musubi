@@ -39,3 +39,6 @@ test_reports/
 !docs/images/**
 coverage.html
 
+# Node dependencies
+node_modules/
+package*.json
