@@ -137,11 +137,20 @@
     },
     {
       "datasource": { "type": "postgres", "uid": "PostgreSQL" },
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 8 },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": { "type": "auto" },
+            "filterable": true,
+            "inspect": true
+          }
+        }
+      },
+      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 8 },
       "id": 5,
       "options": {
-        "footer": { "enablePagination": true, "fields": [], "show": true },
-        "pagination": { "enable": true, "pageSize": 25 },
+        "footer": { "countRows": true, "enablePagination": true, "fields": [], "show": true },
         "showHeader": true,
         "sortBy": [{ "displayName": "Last Updated", "desc": true }]
       },
@@ -160,9 +169,22 @@
     },
     {
       "datasource": { "type": "postgres", "uid": "PostgreSQL" },
-      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 16 },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": { "type": "auto" },
+            "filterable": true,
+            "inspect": true
+          }
+        }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
       "id": 6,
-      "options": { "footer": { "show": false }, "showHeader": true },
+      "options": {
+        "footer": { "countRows": true, "enablePagination": true, "fields": [], "show": true },
+        "showHeader": true
+      },
       "title": "Target Inventory & Real-time Status",
       "type": "table",
       "targets": [
@@ -181,33 +203,42 @@
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic" },
-          "custom": { "drawStyle": "bars", "fillOpacity": 40, "lineInterpolation": "smooth", "lineWidth": 1 },
-          "unit": "reqps"
+          "custom": { "drawStyle": "bars", "fillOpacity": 60, "lineInterpolation": "smooth", "lineWidth": 1 },
+          "unit": "short"
         }
       },
-      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 16 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
       "id": 7,
-      "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "sum"] } },
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["sum", "lastNotNull"] } },
       "title": "SNMP Trap & Inform Reception Rate",
       "type": "timeseries",
       "targets": [
-        { "datasource": { "type": "prometheus", "uid": "VictoriaMetrics" }, "expr": "sum by (type, target) (rate(musubi_snmp_traps_total[1m]))", "legendFormat": "{{target}} [{{type}}]", "refId": "A" }
+        { "datasource": { "type": "prometheus", "uid": "VictoriaMetrics" }, "expr": "sum by (type, target) (musubi_snmp_traps_total)", "legendFormat": "{{target}} [{{type}}]", "refId": "A" }
       ]
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 23 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 28 },
       "id": 300,
       "title": "⚡ Scenario Executions, Job Analytics & Audit Trail",
       "type": "row"
     },
     {
       "datasource": { "type": "postgres", "uid": "PostgreSQL" },
-      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 24 },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": { "type": "auto" },
+            "filterable": true,
+            "inspect": true
+          }
+        }
+      },
+      "gridPos": { "h": 10, "w": 12, "x": 0, "y": 29 },
       "id": 8,
       "options": {
-        "footer": { "enablePagination": true, "fields": [], "show": true },
-        "pagination": { "enable": true, "pageSize": 25 },
+        "footer": { "countRows": true, "enablePagination": true, "fields": [], "show": true },
         "showHeader": true,
         "sortBy": [{ "displayName": "Started At", "desc": true }]
       },
@@ -226,11 +257,20 @@
     },
     {
       "datasource": { "type": "postgres", "uid": "PostgreSQL" },
-      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 24 },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": { "type": "auto" },
+            "filterable": true,
+            "inspect": true
+          }
+        }
+      },
+      "gridPos": { "h": 10, "w": 12, "x": 12, "y": 29 },
       "id": 9,
       "options": {
-        "footer": { "enablePagination": true, "fields": [], "show": true },
-        "pagination": { "enable": true, "pageSize": 25 },
+        "footer": { "countRows": true, "enablePagination": true, "fields": [], "show": true },
         "showHeader": true,
         "sortBy": [{ "displayName": "Timestamp", "desc": true }]
       },
@@ -327,7 +367,7 @@
       }
     ]
   },
-  "time": { "from": "now-15m", "to": "now" },
+  "time": { "from": "now-24h", "to": "now" },
   "timepicker": { "refresh_intervals": ["5s", "10s", "30s", "1m"] },
   "timezone": "browser",
   "title": "Musubi - Network Orchestration & SNMP Observability",

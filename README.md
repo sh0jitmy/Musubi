@@ -257,18 +257,61 @@ teardown:
 
 ---
 
-## 📊 Grafana モニタリングダッシュボード
+## 📊 Grafana モニタリングダッシュボード & 対話型リアルタイム検索
 
-Musubi には、VictoriaMetrics と連携した公式 Grafana ダッシュボードがプリセットされています。システムリソース、リアルタイムSNMPテレメトリ、MIBキャッシュ、シナリオ実行履歴、API監査ログを一元監視できます。
+Musubi には、VictoriaMetrics (TSDB) および PostgreSQL と連携した公式 Grafana ダッシュボードがプリセットされています。システムリソース、リアルタイム SNMP テレメトリ、MIB キャッシュ、シナリオ実行履歴、API 監査ログを一元監視できます。
 
-* **URL**: `http://localhost:3000/d/musubi-overview`
+* **ダッシュボード URL**: `http://localhost:3000/d/musubi-overview`
 
 ![Musubi Grafana Dashboard](docs/images/grafana_dashboard.png)
 
-### 監視ダッシュボードで確認可能な主な情報
+### 主な監視パネルと対話型フィルタリング機能
+- **🎛️ ダッシュボード上部の対話型フィルター (Variables)**:
+  - **`Target`**: ドロップダウンから対象機器（`All`, `spine1`, `spine2` 等）を即座に絞り込み
+  - **`Trigger`**: 状態遷移の契機（`All`, `TRAP`, `INFORM`, `BULK_GET`, `POLLING`, `SET`, `API`）で抽出
+  - **`Status`**: ジョブ実行ステータス（`All`, `SUCCESS`, `FAILED`, `RUNNING`, `QUEUED`, `ABORTED`）で選別
+  - **`Search`**: フリーテキストによる部分一致検索（OID、MIB名、シナリオ名、実行者など）
+  - **時間範囲セレクター**: 右上の Grafana 標準タイムピッカーと連動した期間指定検索（`$__timeFilter`）
 - **🖥️ システムリソース & ネットワーク帯域**: CPU使用率、メモリ割り当て（Heap/Sys/RSS）、HTTP/SNMP帯域幅、Goroutine稼働数
-- **🎯 ターゲット別 SNMP テレメトリ & MIB データキャッシュ**: IF-MIB, IP-MIB, SNMPv2-MIB, OSPF-MIB, BGP4-MIB などの最新値・前回値・取得元（Trap/Inform/BulkGet/Polling）
-- **⚡ シナリオ実行履歴 & 監査ログ**: ジョブIDごとの実行結果（SUCCESS/FAILED）、実行者、タイムスタンプ、API操作監査ログ
+- **🎯 ターゲット別 SNMP テレメトリ & MIB データキャッシュ**: IF-MIB, IP-MIB, SNMPv2-MIB, OSPF-MIB, BGP4-MIB などの最新値・前回値・取得元
+- **⚡ シナリオ実行履歴 & 監査ログ (2000件+ ページネーション対応)**: 各テーブルパネルに 25件/ページのページネーションとインラインソート・検索を装備し、大量レコードでも軽快にブラウジング可能
+
+---
+
+## ⚡ 大規模MIB反映 & 高多重負荷ベンチマーク実測結果 (Benchmark Results)
+
+Musubi の高性能・低遅延特性を検証するため、**Apple M2 (8 Cores: 4P+4E) / 16.0 GB RAM / macOS arm64** 環境にて実機負荷ベンチマークを実施しました。詳細は [負荷・性能ベンチマーク試験記録](docs/load_test_report.md) をご参照ください。
+
+### 1. 2048 OID Bulk-Get / Walk ステータス反映試験
+単一エージェントから 2048 個の MIB OID（256 インターフェース × 8 属性）を一括取得し、内部状態リポジトリ (`stateRepo`) へ反映する性能を測定。
+
+| 測定項目 | 実測値 | 判定 |
+| :--- | :--- | :--- |
+| **対象 OID 総数** | **2048 OIDs** | - |
+| **反映確認 OID 数** | **2048 / 2048 OIDs** | **100.0% 完全反映 (PASS)** |
+| **処理所要時間 (P50)** | **24.09 ms** | 超高速 (P95: 25.16 ms / Avg: 24.34 ms) |
+| **OID 取得スループット** | **84,146.38 OIDs/sec** | 秒間 8.4 万 OID 処理 |
+| **CEL 式評価レイテンシ** | **90.35 µs / query** | サブミリ秒 (< 0.1ms) で即時判定 |
+| **メモリ消費量 (Heap In-Use)** | **4.07 MB** | 16GB Spec に対し 0.03% 未満 |
+
+### 2. 12 Agent 一斉並行シナリオ実行 (3,072 OIDs) 負荷試験
+12 台の独立した SNMP エージェント（各 256 OIDs）に対して、12 本のシナリオジョブ（**Bulk-Get 256 OIDs → SNMP SET 障害注入 → Inform-Request ACK 待ち**）を一斉並行投入。
+
+| 測定項目 | 実測値 | 判定・備考 |
+| :--- | :--- | :--- |
+| **同時並行 Agent 数** | **12 Agents** | 12 並列同時実行 |
+| **同時処理 OID 総数** | **3,072 OIDs** | 256 OIDs × 12 Agents |
+| **ジョブ成功率** | **60 / 60 (100.0%)** | **エラー 0 件 (PASS)** (5反復測定) |
+| **一斉実行 総合所要時間** | **93.73 ms** | 全 12 ジョブ並列完了時間 |
+| **ジョブレイテンシ (Min / P50 / P95 / Max)** | **5.17 ms / 10.55 ms / 41.11 ms / 41.17 ms** | 中央値 10.55ms の高速応答 |
+| **ジョブ実行スループット** | **640.11 jobs/sec** | 高多重並行処理 |
+| **OID 処理スループット** | **163,869.13 OIDs/sec** | 秒間 16 万 OID 処理 |
+| **メモリ消費量 (Heap In-Use)** | **10.02 MB** | 16GB Spec に対し 0.06% 未満 |
+
+```bash
+# ローカル環境でのベンチマーク再実行コマンド
+make benchmark
+```
 
 ---
 
