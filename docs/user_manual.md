@@ -265,6 +265,16 @@ steps:
       value: 2                                               # 2 = down
     ignore_error: false
 
+  # (オプション) ステップ2.5: SNMP Bulk-Get によるインターフェースMIB一括取得
+  # - id: "step2_5_bulk_get_interfaces"
+  #   name: "IF-MIB テーブルの一括取得"
+  #   target: "spine1"
+  #   action: "action.snmp_bulk_get"
+  #   params:
+  #     oid: "1.3.6.1.2.1.2.2.1"
+  #     non_repeaters: 0
+  #     max_repetitions: 10
+
   # ステップ3: Trap または Polling によるリンクダウンの検知待ち
   - id: "step3_wait_for_oper_status_down"
     name: "リンクダウン検知の確認"
@@ -462,26 +472,82 @@ data: {"id":"evt-102","topic":"state.transition","payload":{"target":"spine1","s
 
 ---
 
-## 6. Grafana ダッシュボードによるリアルタイム監視
+## 6. Grafana ダッシュボードによるリアルタイム監視と対話型検索・絞り込み
 
-Musubi は VictoriaMetrics (TSDB) と連携した公式 Grafana ダッシュボード (`deploy/grafana/dashboards/musubi_overview.json`) を標準提供しています。
+Musubi は VictoriaMetrics (TSDB) および PostgreSQL と連携した公式 Grafana ダッシュボード (`deploy/grafana/dashboards/musubi_overview.json`) を標準提供しています。
 
 * **アクセス URL**: `http://localhost:3000/d/musubi-overview`
 * **認証**: 認証なし (Anonymous 閲覧可能) または `admin / admin`
 
 ![Musubi Grafana Dashboard](images/grafana_dashboard.png)
 
-### 提供パネル一覧
+### 6.1 ダッシュボード上部の対話型フィルター (ユーザー指定)
+Grafana ダッシュボード上部には、リアルタイムに対象ログを絞り込むための対話型コントロールが配置されています：
+
+| フィルター変数 | 種別 | 説明・使用例 |
+| :--- | :--- | :--- |
+| **`Target Device` (`$target`)** | ドロップダウン | `All` または登録済みターゲット名（`spine1`, `spine2` 等）を選択して対象機器を即座に絞り込み。 |
+| **`Trigger Source` (`$trigger`)** | ドロップダウン | データ取得元（`All`, `TRAP`, `INFORM`, `BULK_GET`, `POLLING`, `SET`, `API`）で絞り込み。 |
+| **`Job Status` (`$status`)** | ドロップダウン | ジョブ実行結果（`All`, `SUCCESS`, `FAILED`, `RUNNING`, `QUEUED`, `ABORTED`）でシナリオ履歴を抽出。 |
+| **`Search Filter` (`$search`)** | テキスト入力 | MIB名（例: `IF-MIB`）、OID（例: `ifOperStatus`）、シナリオ名、アクション名、ユーザー名を部分一致で検索。 |
+| **時間範囲セレクター (Timepicker)** | 標準UI | 右上の時間範囲（「直近15分」「直近1時間」「昨日」「日時指定」等）を変更すると、`$__timeFilter` により指定期間のログのみを高速抽出。 |
+
+### 6.2 大量レコード (2000+ 件) のスムーズな表示とページネーション
+* **高速ページネーション**: テーブルパネルには 1 ページあたり 25 件のページネーションが有効化されており、2000 レコード以上の大量データが蓄積されてもブラウザの描画負荷なく快適に閲覧可能です。
+* **テーブル内リアルタイム検索 & ソート**: テーブルヘッダーをクリックして任意の列で昇順/降順ソートが可能なほか、カラムごとの即時フィルタリングも利用できます。
+
+### 6.3 提供パネル一覧
 1. **リソース & 帯域監視**: CPU使用率、メモリ消費量、ネットワークスループット (Rx/Tx)。
 2. **SNMP テレメトリ**: 受信 Trap/Inform レート、SNMP Request 処理レート、P95 レイテンシ。
-3. **ターゲット MIB エクスプローラー**: ドロップダウンで機器（`spine1`, `spine2`等）を選択すると、取得済みの MIB ツリー値および Trap 履歴がリアルタイム更新。
-4. **シナリオ & ジョブ稼働状況**: 実行中・完了ジョブの推移、排他リースロック中のターゲット一覧。
+3. **最新 MIB データキャッシュ (Panel 5)**: 時間範囲・機器・トリガー・フリーワードで絞り込み可能な MIB 遷移履歴。
+4. **ターゲット台帳 & ステータス (Panel 6)**: 機器ステータス、ポート、認証プロファイル、最終ハートビート。
+5. **シナリオ ジョブ実行履歴 (Panel 8)**: ジョブ成否、実行日時、トリガー元の推移。
+6. **管理 & API 監査ログ (Panel 9)**: ユーザー操作、クライアント IP、実行アクションの証跡。
 
 ---
 
 ## 7. 運用・保守・ライフサイクル管理
 
-### 7.1 孤立シナリオ (Orphan Scenario) の検知と自動クリーンアップ
+### 7.1 ログリテンション運用 (In-Process Cleaner Worker & パージ)
+
+Musubi は、OS 依存の Cron デーモン（crontab やタスクスケジューラ）を必要とせず、**サーバープロセス内蔵のクロスプラットフォーム Background Cleaner Worker** によってログのローテーション・パージを自律実行します。
+
+#### 1. 環境変数による自動パージ設定
+サーバー起動時（または `docker-compose.yml`）に以下の環境変数を設定するだけで、バックグラウンドワーカーが定期的に古い `state_transition_logs`、`jobs`、`audit_logs` を自動削除します：
+
+```yaml
+environment:
+  - RETENTION_INTERVAL_HOURS=24   # パージ実行間隔 (デフォルト: 24時間毎)
+  - RETENTION_DAYS=30             # ログ保存期間 (デフォルト: 30日、30日超過分をパージ)
+```
+
+#### 2. CLI によるオンデマンド手動パージ
+メンテナンス時や容量逼迫時に、指定日数を超過したログを即座に削除できます：
+
+```bash
+# 30日以前のログを一括パージ
+./bin/musubi-cli maintenance purge --days 30
+
+# 7日以前のログをパージ
+./bin/musubi-cli maintenance purge --days 7
+```
+
+#### 3. REST API によるパージ
+外部の運用監視ツールや CI/CD から HTTP リクエストで実行可能です：
+
+```bash
+curl -X POST http://localhost:8080/v1/system/purge \
+  -H "Content-Type: application/json" \
+  -d '{"days": 30}'
+```
+
+#### 4. TSDB (VictoriaMetrics) および Docker ログのローテーション
+* **VictoriaMetrics**: `docker-compose.yml` 内の起動コマンドに `-retentionPeriod=1` (1ヶ月) が設定されており、TSDB メトリクスも自動破棄されます。
+* **Docker ログ**: `json-file` ドライバに `max-size: "10m"`, `max-file: "3"` が構成されており、コンテナ標準出力ログが無限に肥大化することはありません。
+
+---
+
+### 7.2 孤立シナリオ (Orphan Scenario) の検知と自動クリーンアップ
 
 ターゲット機器を削除・退役させた際、削除されたターゲットを参照しているシナリオ（孤立シナリオ）を自動検知して安全に解消できます。
 
@@ -495,7 +561,7 @@ curl -s -X POST http://localhost:8080/v1/scenarios/cleanups | jq .
 
 ---
 
-### 7.2 ターゲット機器の安全な削除フロー
+### 7.3 ターゲット機器の安全な削除フロー
 
 ```bash
 # ステップ 1: ドレインを開始し、新規ジョブの割り当てを停止
@@ -510,7 +576,7 @@ curl -X DELETE "http://localhost:8080/v1/targets/spine1?force=true&force_abort=t
 
 ---
 
-### 7.3 システムバックアップ & リストア
+### 7.4 システムバックアップ & リストア
 
 全ターゲット、認証プロファイル、シナリオ、バージョン履歴を JSON 形式で瞬時にバックアップ・リストア可能です。
 
@@ -569,8 +635,22 @@ A. はい。シナリオに `teardown` ブロックを記述しておくこと�
 ```
 
 ### 9.2 Mock Agent を活用したローカルシミュレーション
-実機が手元にない場合でも、同梱の `./bin/mock-snmp-agent` を起動しておくことで、開発マシン上で即座に Trap 発行や SNMP GET/SET の結合テストを実施できます。
+実機が手元にない場合でも、同梱の `./bin/mock-snmp-agent` を起動しておくことで、開発マシン上で即座に Trap 発行や SNMP GET/SET/BulkGet の結合テストを実施できます。
+
+### 9.3 一連の SNMP パケットキャプチャ (PCAP) 検証
+シナリオ投入から Bulk-Get、SET、Inform-Request 受信・ACK 返信までの一連のネットワークトラフィックを標準 `.pcap` 形式でキャプチャし、Wireshark や tcpdump でパケットレベルの検証が可能です。
+
+```bash
+# E2E パケットキャプチャの実行とパケット解析
+make pcap-verify
+# または
+python3 scripts/verify_snmp_pcap_flow.py
+
+# 生成された pcap ファイルの確認
+tcpdump -r test_reports/snmp_scenario_flow.pcap -nn -v
+```
 
 ---
 
 *さらなる詳細な内部構造や拡張設計については [docs/architecture.md](architecture.md) および [docs/maintenance_guide.md](maintenance_guide.md) をご参照ください。*
+

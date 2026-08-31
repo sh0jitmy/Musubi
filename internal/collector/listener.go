@@ -19,9 +19,11 @@ package collector
 import (
 	"context"
 	"net"
+	"strings"
 	"sync"
 	"time"
 
+	"github.com/gosnmp/gosnmp"
 	"github.com/sh0jitmy/musubi/internal/common/telemetry"
 )
 
@@ -69,20 +71,66 @@ func (l *Listener) Start() error {
 	go func() {
 		defer l.wg.Done()
 		buf := make([]byte, 4096)
+		snmpDecoder := &gosnmp.GoSNMP{Version: gosnmp.Version2c}
+
 		for {
 			select {
 			case <-l.ctx.Done():
 				return
 			default:
 				_ = conn.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
-				n, addr, err := conn.ReadFromUDP(buf)
-				if err != nil {
+				n, addr, readErr := conn.ReadFromUDP(buf)
+				if readErr != nil {
 					continue
 				}
 				if n > 0 && addr != nil {
 					targetHost := addr.IP.String()
-					telemetry.SNMPTrapCount.WithLabelValues(targetHost, "trap").Inc()
 					telemetry.SNMPNetworkBytes.WithLabelValues(targetHost, "rx").Add(float64(n))
+
+					packet, parseErr := snmpDecoder.SnmpDecodePacket(buf[:n])
+					if parseErr != nil || packet == nil {
+						packet, parseErr = snmpDecoder.UnmarshalTrap(buf[:n], false)
+					}
+					if parseErr != nil || packet == nil {
+						telemetry.SNMPTrapCount.WithLabelValues(targetHost, "trap").Inc()
+						continue
+					}
+
+					triggerType := "TRAP"
+					if packet.PDUType == gosnmp.InformRequest {
+						triggerType = "INFORM"
+					}
+
+					telemetry.SNMPTrapCount.WithLabelValues(targetHost, strings.ToLower(triggerType)).Inc()
+
+					// If InformRequest, reply with Response-PDU as required by RFC 3416
+					if packet.PDUType == gosnmp.InformRequest {
+						respPacket := &gosnmp.SnmpPacket{
+							Version:    packet.Version,
+							Community:  packet.Community,
+							PDUType:    gosnmp.GetResponse,
+							RequestID:  packet.RequestID,
+							Error:      gosnmp.NoError,
+							ErrorIndex: 0,
+							Variables:  packet.Variables,
+						}
+						if respBytes, respErr := respPacket.MarshalMsg(); respErr == nil {
+							_, _ = conn.WriteToUDP(respBytes, addr)
+							telemetry.SNMPNetworkBytes.WithLabelValues(targetHost, "tx").Add(float64(len(respBytes)))
+						}
+					}
+
+					// Dispatch variables to handler
+					if l.handler != nil {
+						for _, v := range packet.Variables {
+							val := parsePduValue(v)
+							l.handler(targetHost, v.Name, val, triggerType)
+							trimmed := strings.TrimPrefix(v.Name, ".")
+							if trimmed != v.Name {
+								l.handler(targetHost, trimmed, val, triggerType)
+							}
+						}
+					}
 				}
 			}
 		}

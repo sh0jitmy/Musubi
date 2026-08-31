@@ -39,6 +39,7 @@ import (
 	"github.com/sh0jitmy/musubi/internal/common/notification"
 	"github.com/sh0jitmy/musubi/internal/common/telemetry"
 	"github.com/sh0jitmy/musubi/internal/common/types"
+	"github.com/sh0jitmy/musubi/internal/database"
 	"github.com/sh0jitmy/musubi/internal/orchestrator"
 	"github.com/sh0jitmy/musubi/internal/state"
 )
@@ -178,7 +179,9 @@ func (s *Server) setupRoutes() {
 
 		// Events
 		v1.GET("/events/streams", s.handleStreamEvents)
+		v1.GET("/events/stream", s.handleStreamEvents)
 		v1.GET("/events/polls", s.handlePollEvents)
+		v1.GET("/events/poll", s.handlePollEvents)
 
 		// MIBs
 		v1.GET("/mibs/trees", s.handleGetMibTree)
@@ -188,6 +191,7 @@ func (s *Server) setupRoutes() {
 		v1.GET("/audit/exports", s.handleExportAuditEvidence)
 		v1.POST("/system/backups", s.handleCreateBackup)
 		v1.POST("/system/restores", s.handleRestoreBackup)
+		v1.POST("/system/purge", s.handlePurgeSystemLogs)
 		v1.GET("/system/healthz", s.handleHealthz)
 		v1.GET("/system/readyz", s.handleReadyz)
 		v1.GET("/system/healths", s.handleDeepHealth)
@@ -931,4 +935,25 @@ func (s *Server) handleDeepHealth(c *gin.Context) {
 			"storage_usage":  gin.H{"usage_mb": 128, "limit_mb": 5120},
 		},
 	})
+}
+
+func (s *Server) handlePurgeSystemLogs(c *gin.Context) {
+	type PurgeRequest struct {
+		Days int `json:"days" form:"days"`
+	}
+	var req PurgeRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		req.Days = 30
+	}
+	if req.Days <= 0 {
+		req.Days = 30
+	}
+
+	res, err := database.PurgeExpiredRecords(c.Request.Context(), s.EntClient, req.Days)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, res)
 }

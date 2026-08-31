@@ -1,7 +1,7 @@
 # Musubi (結び) - Air-gapped SNMP Scenario Orchestrator
 
 [![CI](https://github.com/sh0jitmy/Musubi/actions/workflows/ci.yml/badge.svg)](https://github.com/sh0jitmy/Musubi/actions/workflows/ci.yml)
-[![Go Report Card](https://goreportcard.com/badge/github.com/sh0jitmy/musubi)](https://goreportcard.com/report/github.com/sh0jitmy/musubi)
+[![Go Report Card](https://goreportcard.com/badge/github.com/sh0jitmy/Musubi)](https://goreportcard.com/report/github.com/sh0jitmy/Musubi)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![OpenAPI 3.1](https://img.shields.io/badge/OpenAPI-3.1.0-green.svg)](api/openapi.yaml)
 
@@ -279,6 +279,7 @@ Musubi には、VictoriaMetrics と連携した公式 Grafana ダッシュボー
 | 📖 [ユーザー利用マニュアル](docs/user_manual.md) | 利用者・オペレーター | 実行方法、シナリオ作成詳細、CEL式リファレンス、運用手順、トラブルシューティング |
 | 🏛️ [アーキテクチャ設計仕様書](docs/architecture.md) | 設計者・アーキテクト | モジュラーモノリス設計、ドメイン境界、シーケンス図、ライフサイクル置換表 |
 | 🔧 [メンテナー向け保守ガイド](docs/maintenance_guide.md) | メンテナー・開発者 | 内部実装構造、カバレッジ基準 (80%+)、静的解析、デバッグ手順 |
+| 🚀 [負荷・性能ベンチマーク試験記録](docs/load_test_report.md) | アーキテクト・評価者 | 2048 OID 反映試験、12 Agent × 256 OID 高多重シナリオ負荷試験実測データ (Apple M2) |
 | 📄 [OpenAPI 3.1 仕様書](api/openapi.yaml) | API 連携開発者 | RESTful API エンドポイント、リクエスト/レスポンス JSON スキーマ定義 |
 
 ---
@@ -290,6 +291,8 @@ Musubi には、VictoriaMetrics と連携した公式 Grafana ダッシュボー
 | `make fmt` | ソースコードのフォーマット (`go fmt` / リンター自動修正) |
 | `make lint` | `golangci-lint` による全パッケージの厳格な静的解析 |
 | `make test` | データ競合検知 (`-race`) および 80% 基準カバレッジ測定付きテスト実行 |
+| `make pcap-verify` | SNMP Bulk-Get / SET / Inform フローの自動実行と PCAP パケット構造解析 |
+| `make benchmark` | 大規模 MIB 反映 (2048 OID) & 12 Agent 並列負荷ベンチマーク実行とレポート生成 |
 | `make build` | `bin/` 配下への全実行可能バイナリ (`musubi-server`, `musubi-cli`, `mock-snmp-agent`) コンパイル |
 | `make docker-test` | Docker Compose 環境での E2E 自動検証スクリプト実行 |
 | `make openapi-lint` | Spectral による OpenAPI 3.1 スキーマ文法検証 |

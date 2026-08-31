@@ -57,6 +57,7 @@ func main() {
 			stateCommand(),
 			auditCommand(),
 			systemCommand(),
+			maintenanceCommand(),
 		},
 	}
 
@@ -266,6 +267,41 @@ func systemCommand() *cli.Command {
 				Usage: "Create full system backup",
 				Action: func(c *cli.Context) error {
 					return httpPost(c, "/v1/system/backups", nil)
+				},
+			},
+			{
+				Name:  "purge",
+				Usage: "Purge expired logs (state transitions, jobs, audit logs)",
+				Flags: []cli.Flag{
+					&cli.IntFlag{Name: "days", Value: 30, Usage: "Retention days cutoff"},
+				},
+				Action: func(c *cli.Context) error {
+					payload := map[string]any{
+						"days": c.Int("days"),
+					}
+					return httpPost(c, "/v1/system/purge", payload)
+				},
+			},
+		},
+	}
+}
+
+func maintenanceCommand() *cli.Command {
+	return &cli.Command{
+		Name:  "maintenance",
+		Usage: "System maintenance and log retention operations",
+		Subcommands: []*cli.Command{
+			{
+				Name:  "purge",
+				Usage: "Purge expired logs (state transitions, jobs, audit logs)",
+				Flags: []cli.Flag{
+					&cli.IntFlag{Name: "days", Value: 30, Usage: "Retention days cutoff"},
+				},
+				Action: func(c *cli.Context) error {
+					payload := map[string]any{
+						"days": c.Int("days"),
+					}
+					return httpPost(c, "/v1/system/purge", payload)
 				},
 			},
 		},

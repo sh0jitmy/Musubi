@@ -166,6 +166,103 @@ func (r *Runner) executeStep(ctx context.Context, step types.StepDefinition, inp
 		return nil
 	}
 
+	if step.Action == "action.snmp_bulk_get" {
+		var oids []string
+		if oidList, ok := step.Params["oids"].([]any); ok {
+			for _, o := range oidList {
+				oids = append(oids, fmt.Sprintf("%v", o))
+			}
+		} else if singleOid, ok := step.Params["oid"].(string); ok {
+			oids = []string{singleOid}
+		}
+
+		nonRepeaters := uint8(0)
+		if nr, ok := step.Params["non_repeaters"].(int); ok && nr >= 0 && nr <= 255 {
+			//nolint:gosec // validated range
+			nonRepeaters = uint8(nr)
+		} else if nrf, ok := step.Params["non_repeaters"].(float64); ok && nrf >= 0 && nrf <= 255 {
+			//nolint:gosec // validated range
+			nonRepeaters = uint8(nrf)
+		}
+
+		maxRepetitions := uint32(10)
+		if mr, ok := step.Params["max_repetitions"].(int); ok && mr >= 0 {
+			//nolint:gosec // validated non-negative
+			maxRepetitions = uint32(mr)
+		} else if mrf, ok := step.Params["max_repetitions"].(float64); ok && mrf >= 0 {
+			//nolint:gosec // validated non-negative
+			maxRepetitions = uint32(mrf)
+		}
+
+		client, err := r.provider.GetSNMPClient(ctx, target)
+		if err != nil {
+			return err
+		}
+		if client != nil {
+			walk, _ := step.Params["walk"].(bool)
+			var resMap map[string]any
+			if walk && len(oids) > 0 {
+				resMap, err = client.BulkWalk(oids[0])
+			} else {
+				resMap, err = client.BulkGet(oids, nonRepeaters, maxRepetitions)
+			}
+			if err != nil {
+				return err
+			}
+			for k, v := range resMap {
+				r.stateRepo.SetRaw(target, k, v, "BULK_GET")
+			}
+		}
+		return nil
+	}
+
+	if step.Action == "action.snmp_bulk_walk" {
+		rootOid, _ := step.Params["oid"].(string)
+		if rootOid == "" {
+			rootOid = ".1.3.6.1.2.1"
+		}
+		client, err := r.provider.GetSNMPClient(ctx, target)
+		if err != nil {
+			return err
+		}
+		if client != nil {
+			resMap, err := client.BulkWalk(rootOid)
+			if err != nil {
+				return err
+			}
+			for k, v := range resMap {
+				r.stateRepo.SetRaw(target, k, v, "BULK_WALK")
+			}
+		}
+		return nil
+	}
+
+	if step.Action == "action.snmp_get" {
+		var oids []string
+		if oidList, ok := step.Params["oids"].([]any); ok {
+			for _, o := range oidList {
+				oids = append(oids, fmt.Sprintf("%v", o))
+			}
+		} else if singleOid, ok := step.Params["oid"].(string); ok {
+			oids = []string{singleOid}
+		}
+
+		client, err := r.provider.GetSNMPClient(ctx, target)
+		if err != nil {
+			return err
+		}
+		if client != nil {
+			resMap, err := client.Get(oids)
+			if err != nil {
+				return err
+			}
+			for k, v := range resMap {
+				r.stateRepo.SetRaw(target, k, v, "POLLING")
+			}
+		}
+		return nil
+	}
+
 	if step.WaitUntil != nil {
 		timeout := 30 * time.Second
 		if step.WaitUntil.Timeout != "" {

@@ -140,7 +140,8 @@
       "gridPos": { "h": 8, "w": 24, "x": 0, "y": 8 },
       "id": 5,
       "options": {
-        "footer": { "show": true },
+        "footer": { "enablePagination": true, "fields": [], "show": true },
+        "pagination": { "enable": true, "pageSize": 25 },
         "showHeader": true,
         "sortBy": [{ "displayName": "Last Updated", "desc": true }]
       },
@@ -152,7 +153,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT target AS \"Target\", state_key AS \"MIB / OID\", new_value AS \"Current Value\", old_value AS \"Previous Value\", trigger AS \"Acquisition Source (Trap/Inform/BulkGet)\", created_at AS \"Last Updated\" FROM state_transition_logs ORDER BY created_at DESC LIMIT 100;",
+          "rawSql": "SELECT target AS \"Target\", state_key AS \"MIB / OID\", new_value AS \"Current Value\", old_value AS \"Previous Value\", trigger AS \"Acquisition Source (Trap/Inform/BulkGet)\", created_at AS \"Last Updated\" FROM state_transition_logs WHERE $__timeFilter(created_at) AND ('$target' = 'All' OR target = '$target') AND ('$trigger' = 'All' OR trigger = '$trigger') AND ('$search' = '' OR state_key ILIKE '%' || '$search' || '%' OR target ILIKE '%' || '$search' || '%') ORDER BY created_at DESC LIMIT 2000;",
           "refId": "A"
         }
       ]
@@ -170,7 +171,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT name AS \"Target Name\", host AS \"Host Address\", port AS \"Port\", status AS \"Status\", credential_id AS \"Credential Profile\", updated_at AS \"Last Heartbeat\" FROM targets ORDER BY name ASC;",
+          "rawSql": "SELECT name AS \"Target Name\", host AS \"Host Address\", port AS \"Port\", status AS \"Status\", credential_id AS \"Credential Profile\", updated_at AS \"Last Heartbeat\" FROM targets WHERE ('$target' = 'All' OR name = '$target') ORDER BY name ASC;",
           "refId": "A"
         }
       ]
@@ -204,7 +205,12 @@
       "datasource": { "type": "postgres", "uid": "PostgreSQL" },
       "gridPos": { "h": 7, "w": 12, "x": 0, "y": 24 },
       "id": 8,
-      "options": { "footer": { "show": false }, "showHeader": true },
+      "options": {
+        "footer": { "enablePagination": true, "fields": [], "show": true },
+        "pagination": { "enable": true, "pageSize": 25 },
+        "showHeader": true,
+        "sortBy": [{ "displayName": "Started At", "desc": true }]
+      },
       "title": "Scenario Job Execution History & Verdicts",
       "type": "table",
       "targets": [
@@ -213,7 +219,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT id AS \"Job ID\", scenario_id AS \"Scenario Name\", scenario_version AS \"Version\", status AS \"Execution Verdict\", triggered_by AS \"Triggered By\", created_at AS \"Started At\" FROM jobs ORDER BY created_at DESC LIMIT 20;",
+          "rawSql": "SELECT id AS \"Job ID\", scenario_id AS \"Scenario Name\", scenario_version AS \"Version\", status AS \"Execution Verdict\", triggered_by AS \"Triggered By\", created_at AS \"Started At\" FROM jobs WHERE $__timeFilter(created_at) AND ('$status' = 'All' OR status = '$status') AND ('$search' = '' OR scenario_id ILIKE '%' || '$search' || '%' OR id ILIKE '%' || '$search' || '%') ORDER BY created_at DESC LIMIT 2000;",
           "refId": "A"
         }
       ]
@@ -222,7 +228,12 @@
       "datasource": { "type": "postgres", "uid": "PostgreSQL" },
       "gridPos": { "h": 7, "w": 12, "x": 12, "y": 24 },
       "id": 9,
-      "options": { "footer": { "show": false }, "showHeader": true },
+      "options": {
+        "footer": { "enablePagination": true, "fields": [], "show": true },
+        "pagination": { "enable": true, "pageSize": 25 },
+        "showHeader": true,
+        "sortBy": [{ "displayName": "Timestamp", "desc": true }]
+      },
       "title": "Recent Administrative & API Audit Trail",
       "type": "table",
       "targets": [
@@ -231,7 +242,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT created_at AS \"Timestamp\", user_id AS \"User\", role AS \"Role\", action AS \"Action\", target_id AS \"Target / Resource\", ip AS \"Client IP\" FROM audit_logs ORDER BY created_at DESC LIMIT 20;",
+          "rawSql": "SELECT created_at AS \"Timestamp\", user_id AS \"User\", role AS \"Role\", action AS \"Action\", target_id AS \"Target / Resource\", ip AS \"Client IP\" FROM audit_logs WHERE $__timeFilter(created_at) AND ('$target' = 'All' OR target_id = '$target') AND ('$search' = '' OR action ILIKE '%' || '$search' || '%' OR user_id ILIKE '%' || '$search' || '%') ORDER BY created_at DESC LIMIT 2000;",
           "refId": "A"
         }
       ]
@@ -260,6 +271,59 @@
         "skipUrlSync": false,
         "sort": 1,
         "type": "query"
+      },
+      {
+        "allValue": "All",
+        "current": { "selected": true, "text": "All", "value": "All" },
+        "hide": 0,
+        "includeAll": true,
+        "label": "Trigger Source",
+        "multi": false,
+        "name": "trigger",
+        "options": [
+          { "selected": true, "text": "All", "value": "All" },
+          { "selected": false, "text": "TRAP", "value": "TRAP" },
+          { "selected": false, "text": "INFORM", "value": "INFORM" },
+          { "selected": false, "text": "BULK_GET", "value": "BULK_GET" },
+          { "selected": false, "text": "POLLING", "value": "POLLING" },
+          { "selected": false, "text": "SET", "value": "SET" },
+          { "selected": false, "text": "API", "value": "API" }
+        ],
+        "query": "All, TRAP, INFORM, BULK_GET, POLLING, SET, API",
+        "queryValue": "",
+        "skipUrlSync": false,
+        "type": "custom"
+      },
+      {
+        "allValue": "All",
+        "current": { "selected": true, "text": "All", "value": "All" },
+        "hide": 0,
+        "includeAll": true,
+        "label": "Job Status",
+        "multi": false,
+        "name": "status",
+        "options": [
+          { "selected": true, "text": "All", "value": "All" },
+          { "selected": false, "text": "SUCCESS", "value": "SUCCESS" },
+          { "selected": false, "text": "FAILED", "value": "FAILED" },
+          { "selected": false, "text": "RUNNING", "value": "RUNNING" },
+          { "selected": false, "text": "QUEUED", "value": "QUEUED" },
+          { "selected": false, "text": "ABORTED", "value": "ABORTED" }
+        ],
+        "query": "All, SUCCESS, FAILED, RUNNING, QUEUED, ABORTED",
+        "queryValue": "",
+        "skipUrlSync": false,
+        "type": "custom"
+      },
+      {
+        "current": { "selected": false, "value": "" },
+        "hide": 0,
+        "label": "Search Filter",
+        "name": "search",
+        "options": [{ "selected": true, "value": "" }],
+        "query": "",
+        "skipUrlSync": false,
+        "type": "textbox"
       }
     ]
   },
@@ -268,5 +332,5 @@
   "timezone": "browser",
   "title": "Musubi - Network Orchestration & SNMP Observability",
   "uid": "musubi-overview",
-  "version": 3
+  "version": 4
 }

@@ -15,6 +15,7 @@ help:
 	@echo "    demo             Run full-stack live demo with Docker Compose"
 	@echo "    docker-e2e       Run end-to-end test suite against Docker Compose stack"
 	@echo "    grafana-e2e      Run Grafana UI test, value assertions & HTML report generation"
+	@echo "    pcap-verify      Run SNMP Bulk-Get, SET & Inform flow with PCAP capture"
 	@echo "    build            Build binary to bin/app"
 	@echo "    release-check    Validate GoReleaser configuration"
 	@echo "    release-snapshot Run GoReleaser snapshot build"
@@ -81,6 +82,14 @@ docker-e2e:
 grafana-e2e:
 	@echo "==> Running Grafana UI E2E test & HTML report generation..."
 	@python3 scripts/test_grafana_ui.py
+
+pcap-verify:
+	@echo "==> Running SNMP Scenario PCAP verification & packet analysis..."
+	@python3 scripts/verify_snmp_pcap_flow.py
+
+benchmark:
+	@echo "==> Running Musubi scale & load benchmark suite..."
+	@go run scripts/benchmark_scale_load.go
 
 build: generate
 	@echo "==> Building binaries..."
