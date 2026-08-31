@@ -19,4 +19,4 @@ package main
 
 // Version はアプリケーションのセマンティックバージョンです。
 // GitHub Actions の tagpr によって自動的にインクリメントされ、管理されます。
-const Version = "0.0.2"
+const Version = "0.0.3"
