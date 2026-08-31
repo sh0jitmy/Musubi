@@ -1,5 +1,14 @@
 # Changelog
 
+## [v0.0.3](https://github.com/sh0jitmy/Musubi/compare/v0.0.2...v0.0.3) - 2026-08-31
+
+- chore(deps): bump Songmu/tagpr from 1.20.1 to 1.20.2 by @dependabot[bot] in https://github.com/sh0jitmy/Musubi/pull/17
+- chore(deps): bump github.com/stretchr/testify from 1.11.1 to 1.12.1 by @dependabot[bot] in https://github.com/sh0jitmy/Musubi/pull/16
+- chore(deps): bump golang.org/x/crypto from 0.54.0 to 0.55.0 by @dependabot[bot] in https://github.com/sh0jitmy/Musubi/pull/15
+- docs: add Grafana dashboard image and update manual and documentation by @sh0jitmy in https://github.com/sh0jitmy/Musubi/pull/19
+- feat: implement SNMP trap listener, background log retention worker,and PCAP capture testing utilities by @sh0jitmy in https://github.com/sh0jitmy/Musubi/pull/20
+- feat(grafana): enhance dashboard with column filtering, pagination, trap rate charts and update high-res docs image by @sh0jitmy in https://github.com/sh0jitmy/Musubi/pull/21
+
 ## [v0.0.2](https://github.com/sh0jitmy/Musubi/commits/v0.0.2) - 2026-08-22
 
 - docs: update project requirements in REQUIREMENTS.md by @sh0jitmy in https://github.com/sh0jitmy/Musubi/pull/2
