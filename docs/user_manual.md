@@ -469,22 +469,7 @@ Musubi は VictoriaMetrics (TSDB) と連携した公式 Grafana ダッシュボ�
 * **アクセス URL**: `http://localhost:3000/d/musubi-overview`
 * **認証**: 認証なし (Anonymous 閲覧可能) または `admin / admin`
 
-```
-┌────────────────────────────────────────────────────────────────────────────────────────┐
-│  Musubi System Overview & Live Telemetry Dashboard                                     │
-├────────────────────────────────┬───────────────────────┬───────────────────────────────┤
-│  ⚡ CPU Utilization           │  🧠 Memory Usage      │  🌐 Network Bandwidth (Rx/Tx) │
-│  [======== 4.2% ========]      │  [==== 18.5 MB =====] │  Rx: 1.2 MB/s | Tx: 850 KB/s  │
-├────────────────────────────────┴───────────────────────┴───────────────────────────────┤
-│  📊 Live SNMP Telemetry & Trap Operations                                              │
-│  - Total Traps Received: 1,420 pkts/s      - SNMP Operations P95: 1.8 ms               │
-│  - Active Target Locks : 2 locked          - Running Jobs Count : 1 running            │
-├────────────────────────────────────────────────────────────────────────────────────────┤
-│  🎯 Target Selector: [ spine1 ▼ ]                                                      │
-│  - Latest MIB Data Tree Table (IF-MIB, IP-MIB, HOST-RESOURCES-MIB, BGP4-MIB)           │
-│  - Real-time Trap/Inform Audit Logs Stream Table                                       │
-└────────────────────────────────────────────────────────────────────────────────────────┘
-```
+![Musubi Grafana Dashboard](images/grafana_dashboard.png)
 
 ### 提供パネル一覧
 1. **リソース & 帯域監視**: CPU使用率、メモリ消費量、ネットワークスループット (Rx/Tx)。

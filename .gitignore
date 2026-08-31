@@ -36,5 +36,6 @@ bin/
 # Test artifacts & reports
 test_reports/
 *.png
+!docs/images/**
 coverage.html
 
