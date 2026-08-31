@@ -259,26 +259,16 @@ teardown:
 
 ## 📊 Grafana モニタリングダッシュボード
 
-Musubi には、VictoriaMetrics と連携した公式 Grafana ダッシュボードがプリセットされています。
+Musubi には、VictoriaMetrics と連携した公式 Grafana ダッシュボードがプリセットされています。システムリソース、リアルタイムSNMPテレメトリ、MIBキャッシュ、シナリオ実行履歴、API監査ログを一元監視できます。
 
 * **URL**: `http://localhost:3000/d/musubi-overview`
 
-```
-┌────────────────────────────────────────────────────────────────────────────────────────┐
-│  Musubi System Overview & Live Telemetry Dashboard                                     │
-├────────────────────────────────┬───────────────────────┬───────────────────────────────┤
-│  ⚡ CPU Utilization           │  🧠 Memory Usage      │  🌐 Network Bandwidth (Rx/Tx) │
-│  [======== 4.2% ========]      │  [==== 18.5 MB =====] │  Rx: 1.2 MB/s | Tx: 850 KB/s  │
-├────────────────────────────────┴───────────────────────┴───────────────────────────────┤
-│  📊 Live SNMP Telemetry & Trap Operations                                              │
-│  - Total Traps Received: 1,420 pkts/s      - SNMP Operations P95: 1.8 ms               │
-│  - Active Target Locks : 2 locked          - Running Jobs Count : 1 running            │
-├────────────────────────────────────────────────────────────────────────────────────────┤
-│  🎯 Target Selector: [ spine1 ▼ ]                                                      │
-│  - Latest MIB Data Tree Table (IF-MIB, IP-MIB, HOST-RESOURCES-MIB, BGP4-MIB)           │
-│  - Real-time Trap/Inform Audit Logs Stream Table                                       │
-└────────────────────────────────────────────────────────────────────────────────────────┘
-```
+![Musubi Grafana Dashboard](docs/images/grafana_dashboard.png)
+
+### 監視ダッシュボードで確認可能な主な情報
+- **🖥️ システムリソース & ネットワーク帯域**: CPU使用率、メモリ割り当て（Heap/Sys/RSS）、HTTP/SNMP帯域幅、Goroutine稼働数
+- **🎯 ターゲット別 SNMP テレメトリ & MIB データキャッシュ**: IF-MIB, IP-MIB, SNMPv2-MIB, OSPF-MIB, BGP4-MIB などの最新値・前回値・取得元（Trap/Inform/BulkGet/Polling）
+- **⚡ シナリオ実行履歴 & 監査ログ**: ジョブIDごとの実行結果（SUCCESS/FAILED）、実行者、タイムスタンプ、API操作監査ログ
 
 ---
 
