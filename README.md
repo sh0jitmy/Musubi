@@ -100,6 +100,8 @@ Musubi/
 │   ├── maintenance_guide.md       # 🔧 メンテナー向け保守・トラブルシューティングガイド
 │   └── adr/                       # アーキテクチャ決定記録 (ADR)
 ├── ent/                           # Ent ORM スキーマ定義 & 自動生成コード
+├── examples/                      # 実践サンプルシナリオ (8+リクエスト & Inform待ち等)
+│   └── scenarios/                 # adhoc_8step_linkdown_recovery.yaml 等
 ├── internal/
 │   ├── collector/                 # SNMP Trap/Inform リスナー & SNMP クライアント
 │   ├── common/                    # 共通基盤 (errors, batcher, lifecycle, telemetry, notification)
@@ -253,6 +255,32 @@ teardown:
 # ジョブのステータス & ログ確認
 ./bin/musubi-cli jobs status --id "<JOB_ID>"
 ./bin/musubi-cli jobs logs --id "<JOB_ID>"
+```
+
+### ステップ 4: ワンショット・オンデマンド シナリオ直接実行 (Ad-hoc Execution)
+繰り返されない1回限りのテストやCI/CDからのオンデマンド試験では、**シナリオ登録と実行を分けずに1度のAPI呼び出しで直接実行** できます。シナリオ一覧を汚染せず、各種ログ（Job履歴、状態遷移ログ、監査ログ）を漏れなく自動記録します。
+
+```bash
+# 8リクエスト以上 & SNMP Inform-Request 受信待ちを含むサンプルシナリオの同期ワンショット実行
+curl -X POST http://localhost:8080/v1/scenarios/adhoc \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "adhoc-8step-linkdown-recovery",
+    "wait": true,
+    "inputs": { "target": "spine1" },
+    "dsl_yaml": "'"$(cat examples/scenarios/adhoc_8step_linkdown_recovery.yaml | sed 's/"/\\"/g' | awk '{printf "%s\\n", $0}')"'"
+  }'
+```
+**レスポンス (`200 OK`):**
+```json
+{
+  "job_id": "job-adhoc-1757112000000000",
+  "scenario_id": "adhoc-8step-linkdown-recovery",
+  "status": "SUCCESS",
+  "duration_ms": 135,
+  "locked_targets": ["spine1"],
+  "stream_url": "/v1/events/streams?topics=job.step_advanced&job_id=job-adhoc-1757112000000000"
+}
 ```
 
 ---

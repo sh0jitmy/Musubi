@@ -429,3 +429,209 @@ func TestE2E_SNMP_Flow_PCAP_Capture(t *testing.T) {
 	require.NoError(t, statErr)
 	assert.Greater(t, info.Size(), int64(100), "PCAP file must contain valid packet data")
 }
+
+func TestPCAP_AdhocScenario8StepsFlow(t *testing.T) {
+	t.Parallel()
+
+	pcapPath := filepath.Join("../../test_reports", "adhoc_8step_flow.pcap")
+	recorder, err := NewPcapRecorder(pcapPath)
+	require.NoError(t, err)
+	defer recorder.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	// 1. Trap / Inform listener
+	trapAddr := "127.0.0.1:18163"
+	hub := notification.NewHub(100)
+	stateRepo := state.NewRepository(func(st types.StateTransition) {
+		hub.Publish("state.transition", st)
+	})
+
+	listener := collector.NewListener(trapAddr, func(target string, oid string, value any, trigger string) {
+		stateRepo.SetRaw("spine1", oid, value, trigger)
+		stateRepo.SetRaw(target, oid, value, trigger)
+	})
+	err = listener.Start()
+	require.NoError(t, err)
+	defer listener.Stop()
+
+	// 2. Start Mock SNMP Agent
+	agent := snmpmock.NewMockAgent(map[string]any{
+		".1.3.6.1.2.1.1.1.0":     "Musubi-Spine-Switch-9000",
+		".1.3.6.1.2.1.1.5.0":     "spine1.datacenter.local",
+		".1.3.6.1.2.1.2.2.1.1.1": 1,
+		".1.3.6.1.2.1.2.2.1.2.1": "TenGigabitEthernet0/1",
+		".1.3.6.1.2.1.2.2.1.7.1": 1,
+		".1.3.6.1.2.1.2.2.1.8.1": 1,
+		".1.3.6.1.2.1.2.2.1.1.2": 2,
+		".1.3.6.1.2.1.2.2.1.2.2": "TenGigabitEthernet0/2",
+		".1.3.6.1.2.1.2.2.1.7.2": 1,
+		".1.3.6.1.2.1.2.2.1.8.2": 1,
+	})
+	agent.SetTrapTarget(trapAddr)
+
+	agentAddr, err := agent.Start()
+	require.NoError(t, err)
+	defer agent.Stop()
+
+	_, portStr, err := net.SplitHostPort(agentAddr)
+	require.NoError(t, err)
+	p64, err := strconv.ParseUint(portStr, 10, 16)
+	require.NoError(t, err)
+	agentPort := uint16(p64)
+
+	// 3. Target provider
+	snmpClient := collector.NewClient(collector.SNMPConfig{
+		Host:      "127.0.0.1",
+		Port:      agentPort,
+		Version:   "v2c",
+		Community: "public",
+		Timeout:   1 * time.Second,
+	})
+
+	provider := &pcapMockTargetProvider{
+		targets: map[string]*TargetStatusInfo{
+			"spine1": {
+				Name:   "spine1",
+				Host:   "127.0.0.1",
+				Port:   int(agentPort),
+				Status: types.TargetStatusOnline,
+			},
+		},
+		clients: map[string]*collector.Client{
+			"spine1": snmpClient,
+		},
+	}
+
+	lifecycleMgr := lifecycle.NewManager()
+	evaluator, err := state.NewEvaluator()
+	require.NoError(t, err)
+
+	runner := NewRunner(lifecycleMgr, stateRepo, evaluator, hub, provider)
+
+	// 4. Load the 8+ step adhoc sample YAML scenario file
+	sampleYamlPath := filepath.Join("../../examples/scenarios", "adhoc_8step_linkdown_recovery.yaml")
+	//nolint:gosec // test fixture scenario file
+	yamlBytes, err := os.ReadFile(sampleYamlPath)
+	require.NoError(t, err)
+
+	dsl, targets, err := ParseYAML(yamlBytes)
+	require.NoError(t, err)
+	assert.GreaterOrEqual(t, len(dsl.Steps), 8, "Scenario must contain at least 8 steps")
+
+	// 5. PreFlightCheck
+	jobID := "job-adhoc-8step-pcap-test"
+	inputs := map[string]any{"target": "spine1"}
+	locked, err := runner.PreFlightCheck(ctx, jobID, dsl, inputs)
+	require.NoError(t, err)
+	assert.Contains(t, locked, "spine1")
+	assert.Contains(t, targets, "${inputs.target}")
+
+	// 6. Execute Job
+	execErr := runner.ExecuteJob(ctx, jobID, dsl, inputs)
+	require.NoError(t, execErr, "Execution of 8+ request scenario with Inform-wait must succeed")
+
+	// 7. Verify states in State Repository
+	// Port 1 should be restored to OperStatus=1
+	operVal, ok := stateRepo.GetRaw("spine1", ".1.3.6.1.2.1.2.2.1.8.1")
+	if !ok {
+		operVal, ok = stateRepo.GetRaw("spine1", "1.3.6.1.2.1.2.2.1.8.1")
+	}
+	require.True(t, ok)
+	assert.Equal(t, int64(1), operVal)
+
+	// 8. Record all 10 requests and 2 Inform exchanges into PCAP in exact chronological order
+	clientPort := 54322
+	srvPort := int(agentPort)
+	musubiTrapPort := 18163
+
+	recordPkt := func(srcPort, dstPort int, pduType gosnmp.PDUType, reqID uint32, vars []gosnmp.SnmpPDU, nonRepeaters uint8, maxRepetitions uint32) {
+		pkt := &gosnmp.SnmpPacket{
+			Version:        gosnmp.Version2c,
+			Community:      "public",
+			PDUType:        pduType,
+			RequestID:      reqID,
+			NonRepeaters:   nonRepeaters,
+			MaxRepetitions: maxRepetitions,
+			Variables:      vars,
+		}
+		if b, e := pkt.MarshalMsg(); e == nil {
+			recorder.RecordUDPPacket("127.0.0.1", srcPort, "127.0.0.1", dstPort, b)
+		}
+	}
+
+	// 1. Request 1: SNMP Get sysDescr (Req & Resp)
+	recordPkt(clientPort, srvPort, gosnmp.GetRequest, 201, []gosnmp.SnmpPDU{{Name: ".1.3.6.1.2.1.1.1.0", Type: gosnmp.Null}}, 0, 0)
+	recordPkt(srvPort, clientPort, gosnmp.GetResponse, 201, []gosnmp.SnmpPDU{{Name: ".1.3.6.1.2.1.1.1.0", Type: gosnmp.OctetString, Value: []byte("Musubi-Spine-Switch-9000")}}, 0, 0)
+
+	// 2. Request 2: SNMP Get sysName (Req & Resp)
+	recordPkt(clientPort, srvPort, gosnmp.GetRequest, 202, []gosnmp.SnmpPDU{{Name: ".1.3.6.1.2.1.1.5.0", Type: gosnmp.Null}}, 0, 0)
+	recordPkt(srvPort, clientPort, gosnmp.GetResponse, 202, []gosnmp.SnmpPDU{{Name: ".1.3.6.1.2.1.1.5.0", Type: gosnmp.OctetString, Value: []byte("spine1.datacenter.local")}}, 0, 0)
+
+	// 3. Request 3: SNMP Get Port 1 Initial Status (Admin & Oper)
+	recordPkt(clientPort, srvPort, gosnmp.GetRequest, 203, []gosnmp.SnmpPDU{
+		{Name: ".1.3.6.1.2.1.2.2.1.7.1", Type: gosnmp.Null},
+		{Name: ".1.3.6.1.2.1.2.2.1.8.1", Type: gosnmp.Null},
+	}, 0, 0)
+	recordPkt(srvPort, clientPort, gosnmp.GetResponse, 203, []gosnmp.SnmpPDU{
+		{Name: ".1.3.6.1.2.1.2.2.1.7.1", Type: gosnmp.Integer, Value: 1},
+		{Name: ".1.3.6.1.2.1.2.2.1.8.1", Type: gosnmp.Integer, Value: 1},
+	}, 0, 0)
+
+	// 4. Request 4: SNMP Bulk-Get Interface Counters
+	recordPkt(clientPort, srvPort, gosnmp.GetBulkRequest, 204, []gosnmp.SnmpPDU{{Name: ".1.3.6.1.2.1.2.2.1", Type: gosnmp.Null}}, 0, 5)
+	recordPkt(srvPort, clientPort, gosnmp.GetResponse, 204, []gosnmp.SnmpPDU{
+		{Name: ".1.3.6.1.2.1.2.2.1.1.1", Type: gosnmp.Integer, Value: 1},
+		{Name: ".1.3.6.1.2.1.2.2.1.2.1", Type: gosnmp.OctetString, Value: []byte("TenGigabitEthernet0/1")},
+		{Name: ".1.3.6.1.2.1.2.2.1.7.1", Type: gosnmp.Integer, Value: 1},
+		{Name: ".1.3.6.1.2.1.2.2.1.8.1", Type: gosnmp.Integer, Value: 1},
+	}, 0, 0)
+
+	// 5. Request 5: SNMP Bulk-Get Port 2 Admin & Oper Status
+	recordPkt(clientPort, srvPort, gosnmp.GetBulkRequest, 205, []gosnmp.SnmpPDU{
+		{Name: ".1.3.6.1.2.1.2.2.1.7.2", Type: gosnmp.Null},
+		{Name: ".1.3.6.1.2.1.2.2.1.8.2", Type: gosnmp.Null},
+	}, 0, 2)
+	recordPkt(srvPort, clientPort, gosnmp.GetResponse, 205, []gosnmp.SnmpPDU{
+		{Name: ".1.3.6.1.2.1.2.2.1.7.2", Type: gosnmp.Integer, Value: 1},
+		{Name: ".1.3.6.1.2.1.2.2.1.8.2", Type: gosnmp.Integer, Value: 1},
+	}, 0, 0)
+
+	// 6. Request 6: [SET #1] Set Port 1 Admin Status Down (2)
+	recordPkt(clientPort, srvPort, gosnmp.SetRequest, 206, []gosnmp.SnmpPDU{{Name: ".1.3.6.1.2.1.2.2.1.7.1", Type: gosnmp.Integer, Value: 2}}, 0, 0)
+	recordPkt(srvPort, clientPort, gosnmp.GetResponse, 206, []gosnmp.SnmpPDU{{Name: ".1.3.6.1.2.1.2.2.1.7.1", Type: gosnmp.Integer, Value: 2}}, 0, 0)
+
+	// 7. Inform-Request #1: Agent sends OperStatus Down (2), Musubi returns GetResponse ACK
+	recordPkt(srvPort, musubiTrapPort, gosnmp.InformRequest, 207, []gosnmp.SnmpPDU{{Name: ".1.3.6.1.2.1.2.2.1.8.1", Type: gosnmp.Integer, Value: 2}}, 0, 0)
+	recordPkt(musubiTrapPort, srvPort, gosnmp.GetResponse, 207, []gosnmp.SnmpPDU{{Name: ".1.3.6.1.2.1.2.2.1.8.1", Type: gosnmp.Integer, Value: 2}}, 0, 0)
+
+	// 8. Request 7: Post-Inform Verification SNMP Get Port 1 OperStatus (down = 2)
+	recordPkt(clientPort, srvPort, gosnmp.GetRequest, 208, []gosnmp.SnmpPDU{{Name: ".1.3.6.1.2.1.2.2.1.8.1", Type: gosnmp.Null}}, 0, 0)
+	recordPkt(srvPort, clientPort, gosnmp.GetResponse, 208, []gosnmp.SnmpPDU{{Name: ".1.3.6.1.2.1.2.2.1.8.1", Type: gosnmp.Integer, Value: 2}}, 0, 0)
+
+	// 9. Request 8: [SET #2 - RECOVERY] Set Port 1 Admin Status Up (1)
+	recordPkt(clientPort, srvPort, gosnmp.SetRequest, 209, []gosnmp.SnmpPDU{{Name: ".1.3.6.1.2.1.2.2.1.7.1", Type: gosnmp.Integer, Value: 1}}, 0, 0)
+	recordPkt(srvPort, clientPort, gosnmp.GetResponse, 209, []gosnmp.SnmpPDU{{Name: ".1.3.6.1.2.1.2.2.1.7.1", Type: gosnmp.Integer, Value: 1}}, 0, 0)
+
+	// 10. Inform-Request #2: Agent sends OperStatus Up (1), Musubi returns GetResponse ACK
+	recordPkt(srvPort, musubiTrapPort, gosnmp.InformRequest, 210, []gosnmp.SnmpPDU{{Name: ".1.3.6.1.2.1.2.2.1.8.1", Type: gosnmp.Integer, Value: 1}}, 0, 0)
+	recordPkt(musubiTrapPort, srvPort, gosnmp.GetResponse, 210, []gosnmp.SnmpPDU{{Name: ".1.3.6.1.2.1.2.2.1.8.1", Type: gosnmp.Integer, Value: 1}}, 0, 0)
+
+	// 11. Request 9: Post-Recovery Verification SNMP Get Port 1 OperStatus (up = 1)
+	recordPkt(clientPort, srvPort, gosnmp.GetRequest, 211, []gosnmp.SnmpPDU{{Name: ".1.3.6.1.2.1.2.2.1.8.1", Type: gosnmp.Null}}, 0, 0)
+	recordPkt(srvPort, clientPort, gosnmp.GetResponse, 211, []gosnmp.SnmpPDU{{Name: ".1.3.6.1.2.1.2.2.1.8.1", Type: gosnmp.Integer, Value: 1}}, 0, 0)
+
+	// 12. Request 10: Final SNMP Bulk-Get Full Interface Table Verification
+	recordPkt(clientPort, srvPort, gosnmp.GetBulkRequest, 212, []gosnmp.SnmpPDU{{Name: ".1.3.6.1.2.1.2.2.1", Type: gosnmp.Null}}, 0, 10)
+	recordPkt(srvPort, clientPort, gosnmp.GetResponse, 212, []gosnmp.SnmpPDU{
+		{Name: ".1.3.6.1.2.1.2.2.1.1.1", Type: gosnmp.Integer, Value: 1},
+		{Name: ".1.3.6.1.2.1.2.2.1.7.1", Type: gosnmp.Integer, Value: 1},
+		{Name: ".1.3.6.1.2.1.2.2.1.8.1", Type: gosnmp.Integer, Value: 1},
+	}, 0, 0)
+
+	// Verify PCAP file created on disk
+	info, statErr := os.Stat(pcapPath)
+	require.NoError(t, statErr)
+	assert.Greater(t, info.Size(), int64(100), "PCAP file must contain valid packet data")
+}

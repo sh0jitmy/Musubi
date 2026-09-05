@@ -36,6 +36,7 @@ type MockAgent struct {
 	conn       *net.UDPConn
 	oids       map[string]any
 	sortedKeys []string
+	packetHook func(srcIP string, srcPort int, dstIP string, dstPort int, payload []byte)
 	mu         sync.RWMutex
 	ctx        context.Context
 	cancel     context.CancelFunc
@@ -53,11 +54,20 @@ func NewMockAgent(initialOIDs map[string]any) *MockAgent {
 	if _, ok := oidsCopy[".1.3.6.1.2.1.1.1.0"]; !ok {
 		oidsCopy[".1.3.6.1.2.1.1.1.0"] = "Mock-SNMP-Switch-v1"
 	}
+	if _, ok := oidsCopy[".1.3.6.1.2.1.1.5.0"]; !ok {
+		oidsCopy[".1.3.6.1.2.1.1.5.0"] = "spine1.datacenter.local"
+	}
 	if _, ok := oidsCopy[".1.3.6.1.2.1.2.2.1.7.1"]; !ok {
 		oidsCopy[".1.3.6.1.2.1.2.2.1.7.1"] = 1 // ifAdminStatus.1 = up
 	}
 	if _, ok := oidsCopy[".1.3.6.1.2.1.2.2.1.8.1"]; !ok {
 		oidsCopy[".1.3.6.1.2.1.2.2.1.8.1"] = 1 // ifOperStatus.1 = up
+	}
+	if _, ok := oidsCopy[".1.3.6.1.2.1.2.2.1.7.2"]; !ok {
+		oidsCopy[".1.3.6.1.2.1.2.2.1.7.2"] = 1 // ifAdminStatus.2 = up
+	}
+	if _, ok := oidsCopy[".1.3.6.1.2.1.2.2.1.8.2"]; !ok {
+		oidsCopy[".1.3.6.1.2.1.2.2.1.8.2"] = 1 // ifOperStatus.2 = up
 	}
 	if _, ok := oidsCopy[".1.3.6.1.2.1.2.2.1.10.1"]; !ok {
 		oidsCopy[".1.3.6.1.2.1.2.2.1.10.1"] = int64(1048576) // ifInOctets.1
@@ -90,6 +100,32 @@ func (m *MockAgent) SetTrapTarget(addr string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.trapTarget = addr
+}
+
+// SetPacketHook sets a callback for capturing all UDP packets (requests, responses, informs, traps)
+func (m *MockAgent) SetPacketHook(hook func(srcIP string, srcPort int, dstIP string, dstPort int, payload []byte)) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.packetHook = hook
+}
+
+func (m *MockAgent) recordPacket(srcIP string, srcPort int, dstIP string, dstPort int, payload []byte) {
+	hook := m.packetHook
+	if hook != nil && len(payload) > 0 {
+		hook(srcIP, srcPort, dstIP, dstPort, payload)
+	}
+}
+
+func (m *MockAgent) port() int {
+	if m.conn == nil {
+		return 0
+	}
+	_, pStr, err := net.SplitHostPort(m.addr)
+	if err != nil {
+		return 0
+	}
+	p, _ := strconv.Atoi(pStr)
+	return p
 }
 
 // Start binds to a free UDP port and starts serving
@@ -217,10 +253,14 @@ func (m *MockAgent) SendInform(targetAddr string, vars []gosnmp.SnmpPDU) error {
 	if _, err := conn.Write(rawBytes); err != nil {
 		return err
 	}
+	m.recordPacket("127.0.0.1", m.port(), host, int(port), rawBytes)
 
-	_ = conn.SetReadDeadline(time.Now().Add(50 * time.Millisecond))
+	_ = conn.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
 	respBuf := make([]byte, 2048)
-	_, _ = conn.Read(respBuf)
+	respN, _ := conn.Read(respBuf)
+	if respN > 0 {
+		m.recordPacket(host, int(port), "127.0.0.1", m.port(), respBuf[:respN])
+	}
 	return nil
 }
 
@@ -243,6 +283,7 @@ func (m *MockAgent) serve() {
 		}
 
 		if n > 0 && raddr != nil {
+			m.recordPacket(raddr.IP.String(), raddr.Port, "127.0.0.1", m.port(), buf[:n])
 			packet, decErr := decoder.SnmpDecodePacket(buf[:n])
 			if decErr != nil || packet == nil {
 				packet, decErr = decoder.UnmarshalTrap(buf[:n], false)
@@ -362,6 +403,7 @@ func (m *MockAgent) handlePacket(packet *gosnmp.SnmpPacket, raddr *net.UDPAddr) 
 	respBytes, err := respPacket.MarshalMsg()
 	if err == nil {
 		_, _ = m.conn.WriteToUDP(respBytes, raddr)
+		m.recordPacket("127.0.0.1", m.port(), raddr.IP.String(), raddr.Port, respBytes)
 	}
 }
 
