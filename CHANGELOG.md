@@ -1,5 +1,9 @@
 # Changelog
 
+## [v0.0.4](https://github.com/sh0jitmy/Musubi/compare/v0.0.3...v0.0.4) - 2026-09-05
+
+- feat: implement ad-hoc scenario execution and enhance integration testing with PCAP recording support by @sh0jitmy in https://github.com/sh0jitmy/Musubi/pull/22
+
 ## [v0.0.3](https://github.com/sh0jitmy/Musubi/compare/v0.0.2...v0.0.3) - 2026-08-31
 
 - chore(deps): bump Songmu/tagpr from 1.20.1 to 1.20.2 by @dependabot[bot] in https://github.com/sh0jitmy/Musubi/pull/17
