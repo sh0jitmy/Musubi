@@ -139,6 +139,16 @@ func (l *Listener) Start() error {
 	return nil
 }
 
+// Addr returns the bound local address string
+func (l *Listener) Addr() string {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.conn != nil {
+		return l.conn.LocalAddr().String()
+	}
+	return l.addr
+}
+
 // Stop gracefully closes the UDP listener
 func (l *Listener) Stop() {
 	l.cancel()

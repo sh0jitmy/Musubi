@@ -12,7 +12,12 @@
 2. [クイックスタート & 環境構築](#2-クイックスタート--環境構築)
 3. [認証プロファイルとターゲット機器の管理](#3-認証プロファイルとターゲット機器の管理)
 4. [シナリオ作成パーフェクトガイド (DSL & CEL 仕様)](#4-シナリオ作成パーフェクトガイド-dsl--cel-仕様)
-5. [シナリオの登録・実行・進捗監視](#5-シナリオの登録実行進捗監視)
+5. [シナリオの登録・実行・進捗監視・オンデマンド実行](#5-シナリオの登録実行進捗監視オンデマンド実行)
+   - 5.1 [シナリオの登録 (Import)](#51-シナリオの登録-import)
+   - 5.2 [シナリオの実行 (Run Job)](#52-シナリオの実行-run-job)
+   - 5.3 [ジョブの進捗確認・ログ取得・強制キャンセル](#53-ジョブの進捗確認ログ取得強制キャンセル)
+   - 5.4 [SSE によるリアルタイムストリーム購読](#54-sse-server-sent-events-によるリアルタイムストリーム購読)
+   - 5.5 [オンデマンド・ワンショット シナリオ直接実行 (Ad-hoc Execution)](#55-オンデマンドワンショット-シナリオ直接実行-ad-hoc-execution)
 6. [Grafana ダッシュボードによるリアルタイム監視](#6-grafana-ダッシュボードによるリアルタイム監視)
 7. [運用・保守・ライフサイクル管理](#7-運用保守ライフサイクル管理)
 8. [トラブルシューティング & FAQ](#8-トラブルシューティング--faq)
@@ -469,6 +474,89 @@ data: {"id":"evt-101","topic":"job.step_advanced","payload":{"job_id":"job-1","s
 
 data: {"id":"evt-102","topic":"state.transition","payload":{"target":"spine1","state_key":"IF-MIB::ifOperStatus.1","old_value":"up","new_value":"down","trigger":"TRAP"},"timestamp":"2026-08-22T14:30:05Z"}
 ```
+
+---
+
+### 5.5 オンデマンド・ワンショット シナリオ直接実行 (Ad-hoc Execution)
+
+日常の運用や一時的な疎通確認、CI/CD からのパトロール実行など、**「繰り返されない1回限りのテスト」** において、事前にシナリオカタログへ登録することなく、1度の API 呼び出しでインラインの YAML 定義を即時実行できます。
+
+#### 💡 特徴・メリット
+1. **カタログ汚染ゼロ**: `GET /v1/scenarios` の一覧にテンポラリな使い捨てシナリオが登録・蓄積されません。
+2. **完全なログ・証跡記録**:
+   - **Job 履歴 (`Job`)**: 実行ステータス、入出力、開始/終了時刻、所要時間をDBに完全保存。
+   - **状態遷移ログ (`StateTransitionLog`)**: SNMP Get, BulkGet, Set および Inform-Request による MIB 値変化をリアルタイム保存（Grafana で検索可能）。
+   - **監査ログ (`AuditLog`)**: 実行者、IP、対象機器、DSL構造の証跡を自動記録。
+   - **メトリクス**: Prometheus / VictoriaMetrics にジョブ実行メトリクスを自動反映。
+3. **同期 (`wait=true`) / 非同期 (`wait=false`) の両対応**:
+   - CLI スクリプトや curl で即座に成否・所要時間を受け取りたい場合は同期モード、長時間シナリオには非同期モードを選択可能。
+
+#### REST API エンドポイント
+* **パス**: `POST /v1/scenarios/adhoc`
+* **認証**: Bearer JWT
+
+#### 実行例 1: 同期実行 (ワンショットで即座に結果を取得)
+`"wait": true` を指定すると、全ステップの実行完了（または失敗）まで HTTP 接続を維持し、結果ステータスを即座に返却します。
+
+```bash
+curl -X POST http://localhost:8080/v1/scenarios/adhoc \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "adhoc-8step-linkdown-recovery",
+    "wait": true,
+    "inputs": {
+      "target": "spine1"
+    },
+    "dsl_yaml": "'"$(cat examples/scenarios/adhoc_8step_linkdown_recovery.yaml | sed 's/"/\\"/g' | awk '{printf "%s\\n", $0}')"'"
+  }'
+```
+
+**同期レスポンス例 (`200 OK`):**
+```json
+{
+  "job_id": "job-adhoc-1757112000000000",
+  "scenario_id": "adhoc-8step-linkdown-recovery",
+  "status": "SUCCESS",
+  "duration_ms": 135,
+  "locked_targets": ["spine1"],
+  "stream_url": "/v1/events/streams?topics=job.step_advanced&job_id=job-adhoc-1757112000000000"
+}
+```
+
+#### 実行例 2: 非同期実行 (長時間ジョブ・進捗ストリーミング)
+`"wait": false`（デフォルト）の場合、即座に `202 Accepted` が返却され、SSE ストリームで進捗をリアルタイム追跡できます。
+
+```bash
+curl -X POST http://localhost:8080/v1/scenarios/adhoc \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "adhoc-spine-check",
+    "wait": false,
+    "dsl_yaml": "'"$(cat examples/scenarios/adhoc_8step_linkdown_recovery.yaml | sed 's/"/\\"/g' | awk '{printf "%s\\n", $0}')"'"
+  }'
+```
+
+**非同期レスポンス例 (`202 Accepted`):**
+```json
+{
+  "job_id": "job-adhoc-1757112000000001",
+  "scenario_id": "adhoc-spine-check",
+  "status": "RUNNING",
+  "locked_targets": ["spine1"],
+  "stream_url": "/v1/events/streams?topics=job.step_advanced&job_id=job-adhoc-1757112000000001"
+}
+```
+
+#### サンプルシナリオ解説 (`examples/scenarios/adhoc_8step_linkdown_recovery.yaml`)
+本機能向けに、**8 リクエスト以上（計10リクエスト）** かつ **SNMP Inform-Request 受信待ち** を含む実戦的なリンク障害・復旧テストサンプルを用意しています：
+- **Step 1-3**: システム情報（`sysDescr`, `sysName`）およびポート1の初期ステータス（`ifAdminStatus.1`, `ifOperStatus.1`）取得 (Get 3回)
+- **Step 4-5**: 全インターフェースカウンタおよびポート2の状態一括取得 (BulkGet 2回)
+- **Step 6**: ポート1の強制ダウン注入 (`action.snmp_set`, `ifAdminStatus.1 = 2`) (Set 1回)
+- **Step 7**: **エージェントからの SNMP Inform-Request（`ifOperStatus.1 == 2`）を待機**（Musubi が自動で RFC 3416 準拠の Response-PDU ACK を返信）
+- **Step 8**: ポート1のダウン確認 (Get 1回)
+- **Step 9**: ポート1の管理者復旧 (`action.snmp_set`, `ifAdminStatus.1 = 1`) (Set 1回)
+- **Step 10**: **エージェントからの SNMP Inform-Request（`ifOperStatus.1 == 1`）を待機**
+- **Step 11-12**: 復旧確認および全インターフェースの最終検証 (Get 1回, BulkGet 1回)
 
 ---
 

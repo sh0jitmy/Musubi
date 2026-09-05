@@ -534,6 +534,60 @@ paths:
               schema:
                 $ref: '#/components/schemas/ProblemDetails'
 
+  /v1/scenarios/adhoc:
+    post:
+      summary: Execute Ad-Hoc / One-Shot Scenario
+      description: Execute scenario definition directly inline without prior registration to the scenario catalog. Persists job execution history, full state transitions, and tamper-evident audit evidence.
+      operationId: runAdhocScenario
+      tags:
+        - Scenarios
+      security:
+        - BearerAuth: []
+      requestBody:
+        description: Ad-hoc scenario definition and execution options
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdhocScenarioRequest'
+      responses:
+        '200':
+          description: Synchronous execution completed successfully (when wait=true)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdhocExecutionResult'
+        '202':
+          description: Asynchronous execution accepted and started (when wait=false)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobExecutionResponse'
+        '400':
+          description: Invalid DSL YAML or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '404':
+          description: Target not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '409':
+          description: Target lock contention
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '422':
+          description: Synchronous execution failed during step run
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+
   /v1/scenarios/{id}:
     get:
       summary: Get Scenario Details
@@ -1697,6 +1751,72 @@ components:
           type: string
           description: Version creation timestamp
           example: "2026-08-14T10:00:00Z"
+
+    AdhocScenarioRequest:
+      description: Request payload for executing an ad-hoc / one-shot scenario.
+      type: object
+      required:
+        - dsl_yaml
+      properties:
+        name:
+          type: string
+          description: Optional scenario identifier or label
+          example: "adhoc-8step-linkdown-recovery"
+        dsl_yaml:
+          type: string
+          description: Inline YAML Scenario DSL definition
+          example: "name: adhoc-flow\nsteps: []"
+        inputs:
+          type: object
+          description: Dynamic runtime input variables
+          additionalProperties: true
+        wait:
+          type: boolean
+          description: If true, wait synchronously for execution completion. If false (default), execute asynchronously.
+          default: false
+          example: true
+
+    AdhocExecutionResult:
+      description: Result payload returned when synchronous execution completes.
+      type: object
+      required:
+        - job_id
+        - scenario_id
+        - status
+        - duration_ms
+        - stream_url
+      properties:
+        job_id:
+          type: string
+          description: Generated job identifier
+          example: "job-adhoc-1725541200000000"
+        scenario_id:
+          type: string
+          description: Scenario identifier
+          example: "adhoc-8step-linkdown-recovery"
+        status:
+          type: string
+          description: Final execution status (SUCCESS or FAILED)
+          enum: [SUCCESS, FAILED]
+          example: "SUCCESS"
+        duration_ms:
+          type: integer
+          description: Total execution duration in milliseconds
+          example: 320
+        locked_targets:
+          type: array
+          description: Targets locked during execution
+          items:
+            type: string
+            example: "spine1"
+        stream_url:
+          type: string
+          description: SSE stream URL of the job
+          example: "/v1/events/streams?topics=job.step_advanced&job_id=job-adhoc-1725541200000000"
+        error:
+          type: string
+          description: Failure reason if status is FAILED
+          example: "step 3 failed: wait.until timed out"
 
     CreateScenarioRequest:
       description: Request payload for registering a new scenario.

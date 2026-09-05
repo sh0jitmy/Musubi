@@ -160,6 +160,7 @@ func (s *Server) setupRoutes() {
 		// Scenarios
 		v1.GET("/scenarios", s.handleListScenarios)
 		v1.POST("/scenarios", s.handleCreateScenario)
+		v1.POST("/scenarios/adhoc", s.handleAdhocScenario)
 		v1.GET("/scenarios/:id", s.handleGetScenario)
 		v1.PUT("/scenarios/:id", s.handleUpdateScenario)
 		v1.DELETE("/scenarios/:id", s.handleDeleteScenario)
@@ -772,6 +773,158 @@ func (s *Server) handleRunScenario(c *gin.Context) {
 	streamURL := fmt.Sprintf("/v1/events/streams?topics=job.step_advanced&job_id=%s", jobID)
 	c.JSON(http.StatusAccepted, gin.H{
 		"job_id":         jobID,
+		"status":         types.JobStatusRunning,
+		"locked_targets": lockedTargets,
+		"stream_url":     streamURL,
+	})
+}
+
+func (s *Server) handleAdhocScenario(c *gin.Context) {
+	var req struct {
+		Name    string         `json:"name"`
+		DSLYAML string         `json:"dsl_yaml" binding:"required"`
+		Inputs  map[string]any `json:"inputs"`
+		Wait    bool           `json:"wait"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		_ = c.Error(errors.NewBadRequest(err.Error(), "INVALID_PARAM", "/v1/scenarios/adhoc"))
+		return
+	}
+
+	dsl, _, err := orchestrator.ParseYAML([]byte(req.DSLYAML))
+	if err != nil {
+		_ = c.Error(errors.NewBadRequest(err.Error(), "INVALID_YAML", "/v1/scenarios/adhoc"))
+		return
+	}
+
+	scenarioName := req.Name
+	if scenarioName == "" {
+		if dsl.Name != "" {
+			scenarioName = dsl.Name
+		} else {
+			scenarioName = "adhoc"
+		}
+	}
+
+	jobID := fmt.Sprintf("job-adhoc-%d", time.Now().UnixNano())
+
+	// 1. Pre-flight check & target lease lock acquisition
+	lockedTargets, err := s.Runner.PreFlightCheck(c.Request.Context(), jobID, dsl, req.Inputs)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	// 2. Create Job in Ent DB (ephemeral scenario execution without modifying scenario catalog)
+	startTime := time.Now()
+	_, _ = s.EntClient.Job.Create().
+		SetID(jobID).
+		SetScenarioID(scenarioName).
+		SetScenarioVersion(0).
+		SetStatus(types.JobStatusRunning).
+		SetDynamicInputs(req.Inputs).
+		SetLockedTargets(lockedTargets).
+		SetTriggeredBy("adhoc-api").
+		SetStartedAt(startTime).
+		Save(c.Request.Context())
+
+	// 3. Record Audit Log for adhoc execution evidence
+	primaryTarget := ""
+	if len(lockedTargets) > 0 {
+		primaryTarget = lockedTargets[0]
+	}
+	_, _ = s.EntClient.AuditLog.Create().
+		SetID(fmt.Sprintf("audit-adhoc-%d", time.Now().UnixNano())).
+		SetAction("SCENARIO_ADHOC_EXECUTE").
+		SetUserID("admin").
+		SetRole("Administrator").
+		SetIP(c.ClientIP()).
+		SetTargetID(primaryTarget).
+		SetScenarioID(scenarioName).
+		SetDiff(map[string]any{
+			"job_id":       jobID,
+			"scenario":     scenarioName,
+			"steps_count":  len(dsl.Steps),
+			"wait":         req.Wait,
+			"target_locks": lockedTargets,
+		}).
+		Save(c.Request.Context())
+
+	telemetry.ScenarioJobCount.WithLabelValues(scenarioName, types.JobStatusRunning).Inc()
+
+	streamURL := fmt.Sprintf("/v1/events/streams?topics=job.step_advanced&job_id=%s", jobID)
+
+	// 4. Synchronous execution if wait=true
+	if req.Wait {
+		jobCtx, jobCancel := context.WithCancel(context.Background())
+		s.LifecycleMgr.RegisterJobCancel(jobID, jobCancel)
+		defer jobCancel()
+
+		execErr := s.Runner.ExecuteJob(jobCtx, jobID, dsl, req.Inputs)
+		finishTime := time.Now()
+		durationMs := finishTime.Sub(startTime).Milliseconds()
+
+		if execErr != nil {
+			_, _ = s.EntClient.Job.Update().
+				Where(job.IDEQ(jobID)).
+				SetStatus(types.JobStatusFailed).
+				SetFinishedAt(finishTime).
+				Save(context.Background())
+			telemetry.ScenarioJobCount.WithLabelValues(scenarioName, types.JobStatusFailed).Inc()
+
+			c.JSON(http.StatusUnprocessableEntity, gin.H{
+				"job_id":         jobID,
+				"scenario_id":    scenarioName,
+				"status":         types.JobStatusFailed,
+				"duration_ms":    durationMs,
+				"error":          execErr.Error(),
+				"locked_targets": lockedTargets,
+				"stream_url":     streamURL,
+			})
+			return
+		}
+
+		_, _ = s.EntClient.Job.Update().
+			Where(job.IDEQ(jobID)).
+			SetStatus(types.JobStatusSuccess).
+			SetFinishedAt(finishTime).
+			Save(context.Background())
+		telemetry.ScenarioJobCount.WithLabelValues(scenarioName, types.JobStatusSuccess).Inc()
+
+		c.JSON(http.StatusOK, gin.H{
+			"job_id":         jobID,
+			"scenario_id":    scenarioName,
+			"status":         types.JobStatusSuccess,
+			"duration_ms":    durationMs,
+			"locked_targets": lockedTargets,
+			"stream_url":     streamURL,
+		})
+		return
+	}
+
+	// Asynchronous execution if wait=false (default)
+	jobCtx, jobCancel := context.WithCancel(context.Background())
+	s.LifecycleMgr.RegisterJobCancel(jobID, jobCancel)
+
+	go func() {
+		defer jobCancel()
+		execErr := s.Runner.ExecuteJob(jobCtx, jobID, dsl, req.Inputs)
+		finishTime := time.Now()
+		finalStatus := types.JobStatusSuccess
+		if execErr != nil {
+			finalStatus = types.JobStatusFailed
+		}
+		_, _ = s.EntClient.Job.Update().
+			Where(job.IDEQ(jobID)).
+			SetStatus(finalStatus).
+			SetFinishedAt(finishTime).
+			Save(context.Background())
+		telemetry.ScenarioJobCount.WithLabelValues(scenarioName, finalStatus).Inc()
+	}()
+
+	c.JSON(http.StatusAccepted, gin.H{
+		"job_id":         jobID,
+		"scenario_id":    scenarioName,
 		"status":         types.JobStatusRunning,
 		"locked_targets": lockedTargets,
 		"stream_url":     streamURL,
