@@ -6,9 +6,37 @@ before:
     - go mod tidy
 
 builds:
-  - env:
+  - id: musubi-server
+    binary: musubi-server
+    main: ./cmd/musubi-server
+    env:
       - CGO_ENABLED=0
-    main: ./cmd/app
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+
+  - id: musubi-cli
+    binary: musubi-cli
+    main: ./cmd/musubi-cli
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+
+  - id: mock-snmp-agent
+    binary: mock-snmp-agent
+    main: ./cmd/mock-snmp-agent
+    env:
+      - CGO_ENABLED=0
     goos:
       - linux
       - darwin
@@ -18,7 +46,8 @@ builds:
       - arm64
 
 archives:
-  - format: tar.gz
+  - formats:
+      - tar.gz
     # this name template makes the OS and Arch compatible with the format of Go binaries
     name_template: >-
       {{ .ProjectName }}_
@@ -30,7 +59,8 @@ archives:
     # use zip for windows archives
     format_overrides:
       - goos: windows
-        format: zip
+        formats:
+          - zip
 
 checksum:
   name_template: 'checksums.txt'
