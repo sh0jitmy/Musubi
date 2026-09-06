@@ -1,4 +1,4 @@
-// Copyright 2026 [Copyright Holder]
+// Copyright 2026 Musubi Contributors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-// Author: [YOUR_NAME]
+// Author: sh0jitmy
 
 package errors
 
@@ -52,6 +52,8 @@ func (p *ProblemDetails) Error() string {
 	return fmt.Sprintf("[%s] %s: %s (status: %d)", p.Code, p.Title, p.Detail, p.Status)
 }
 
+var jsonUnmarshal = json.Unmarshal
+
 // MarshalJSON custom serializer
 func (p *ProblemDetails) MarshalJSON() ([]byte, error) {
 	type Alias ProblemDetails
@@ -63,7 +65,7 @@ func (p *ProblemDetails) MarshalJSON() ([]byte, error) {
 		return raw, nil
 	}
 	var m map[string]any
-	if err := json.Unmarshal(raw, &m); err != nil {
+	if err := jsonUnmarshal(raw, &m); err != nil {
 		return nil, err
 	}
 	for k, v := range p.Extra {

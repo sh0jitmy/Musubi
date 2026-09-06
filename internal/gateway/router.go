@@ -1,4 +1,4 @@
-// Copyright 2026 [Copyright Holder]
+// Copyright 2026 Musubi Contributors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-// Author: [YOUR_NAME]
+// Author: sh0jitmy
 
 package gateway
 
@@ -46,13 +46,14 @@ import (
 
 // Server encapsulates the HTTP Gateway and all bounded contexts
 type Server struct {
-	Engine       *gin.Engine
-	EntClient    *ent.Client
-	LifecycleMgr *lifecycle.Manager
-	StateRepo    *state.Repository
-	Evaluator    *state.Evaluator
-	Hub          *notification.Hub
-	Runner       *orchestrator.Runner
+	Engine               *gin.Engine
+	EntClient            *ent.Client
+	LifecycleMgr         *lifecycle.Manager
+	StateRepo            *state.Repository
+	Evaluator            *state.Evaluator
+	Hub                  *notification.Hub
+	Runner               *orchestrator.Runner
+	SSEKeepAliveInterval time.Duration
 }
 
 // TargetProviderAdapter adapts EntClient to orchestrator.TargetProvider
@@ -799,11 +800,7 @@ func (s *Server) handleAdhocScenario(c *gin.Context) {
 
 	scenarioName := req.Name
 	if scenarioName == "" {
-		if dsl.Name != "" {
-			scenarioName = dsl.Name
-		} else {
-			scenarioName = "adhoc"
-		}
+		scenarioName = dsl.Name
 	}
 
 	jobID := fmt.Sprintf("job-adhoc-%d", time.Now().UnixNano())
@@ -1004,7 +1001,11 @@ func (s *Server) handleStreamEvents(c *gin.Context) {
 	c.Writer.Flush()
 
 	notify := c.Request.Context().Done()
-	ticker := time.NewTicker(15 * time.Second)
+	interval := s.SSEKeepAliveInterval
+	if interval <= 0 {
+		interval = 15 * time.Second
+	}
+	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
 	for {

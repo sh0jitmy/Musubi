@@ -5,7 +5,7 @@ user-invocable: true
 license: Apache-2.0
 compatibility: Designed for Claude Code, Cursor, OpenCode, OpenClaw, and other AI coding agents.
 metadata:
-  author: [YOUR_NAME]
+  author: sh0jitmy
   version: "1.0.0"
   openclaw:
     emoji: "⚙"
@@ -122,7 +122,7 @@ func NewSecureJSONHandler() slog.Handler {
 新規に Go ソースファイル（`.go`）を作成する、または修正する際は、必ずファイル冒頭に以下の形式で Apache License 2.0 および作成者（`Author`）を示すヘッダーコメントを含めてください。
 
 ```go
-// Copyright 2026 [Copyright Holder]
+// Copyright 2026 Musubi Contributors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -136,6 +136,6 @@ func NewSecureJSONHandler() slog.Handler {
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-// Author: [YOUR_NAME]
+// Author: sh0jitmy
 ```
 

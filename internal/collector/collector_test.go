@@ -1,4 +1,4 @@
-// Copyright 2026 [Copyright Holder]
+// Copyright 2026 Musubi Contributors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-// Author: [YOUR_NAME]
+// Author: sh0jitmy
 
 package collector
 
@@ -161,7 +161,7 @@ func TestListener_StartStop(t *testing.T) {
 	t.Parallel()
 
 	var trapReceived bool
-	l := NewListener("127.0.0.1:18162", func(target string, oid string, val any, trigger string) {
+	l := NewListener("127.0.0.1:0", func(target string, oid string, val any, trigger string) {
 		trapReceived = true
 	})
 
@@ -184,8 +184,58 @@ func TestSNMP_ErrorPaths(t *testing.T) {
 	_, err := invalidCli.buildGoSNMP()
 	require.Error(t, err)
 
-	// Build PDU invalid int
+	// Test methods on invalid version (buildGoSNMP error branch)
+	_, err = invalidCli.Get([]string{".1.3.6.1.2.1.1.1.0"})
+	require.Error(t, err)
+	_, err = invalidCli.BulkGet([]string{".1.3.6.1.2.1.1.1.0"}, 0, 5)
+	require.Error(t, err)
+	_, err = invalidCli.BulkWalk(".1.3.6.1.2.1.1.1.0")
+	require.Error(t, err)
+	err = invalidCli.Set(".1.3.6.1.2.1.1.1.0", "string", "test")
+	require.Error(t, err)
+
+	// Test methods with unresolvable host (snmp.Connect error branch)
+	badConnectCli := NewClient(SNMPConfig{
+		Host:    "256.256.256.256",
+		Version: "v2c",
+		Timeout: 20 * time.Millisecond,
+		Retries: 0,
+	})
+	_, err = badConnectCli.Get([]string{".1.3.6.1.2.1.1.1.0"})
+	require.Error(t, err)
+	_, err = badConnectCli.BulkGet([]string{".1.3.6.1.2.1.1.1.0"}, 0, 5)
+	require.Error(t, err)
+	_, err = badConnectCli.BulkWalk(".1.3.6.1.2.1.1.1.0")
+	require.Error(t, err)
+	err = badConnectCli.Set(".1.3.6.1.2.1.1.1.0", "string", "test")
+	require.Error(t, err)
+
+	// Build PDU default case & invalid int
+	defaultPdu, err := buildPdu(".1.3.6.1.2.1.1.1.0", "unknown_type", "val123")
+	require.NoError(t, err)
+	assert.Equal(t, gosnmp.OctetString, defaultPdu.Type)
+
 	_, err = buildPdu(".1.3.6.1.2.1.2.2.1.8.1", "int", "not-a-number")
+	require.Error(t, err)
+
+	// parsePduValue with OctetString where Value is not []byte
+	strVal := parsePduValue(gosnmp.SnmpPDU{Type: gosnmp.OctetString, Value: 12345})
+	assert.Equal(t, "12345", strVal)
+
+	// Set with buildPdu error against a connected mock agent
+	mockAg := snmpmock.NewMockAgent(nil)
+	mAddr, err := mockAg.Start()
+	require.NoError(t, err)
+	defer mockAg.Stop()
+
+	mHost, mPortStr, _ := net.SplitHostPort(mAddr)
+	mP, _ := strconv.ParseUint(mPortStr, 10, 16)
+	validCli := NewClient(SNMPConfig{
+		Host:    mHost,
+		Port:    uint16(mP),
+		Version: "v2c",
+	})
+	err = validCli.Set(".1.3.6.1.2.1.1.1.0", "int", "not-an-int")
 	require.Error(t, err)
 
 	// Connection failure Get
@@ -204,6 +254,18 @@ func TestSNMP_ErrorPaths(t *testing.T) {
 
 	// Connection failure Set
 	err = cli.Set(".1.3.6.1.2.1.1.1.0", "string", "newval")
+	require.Error(t, err)
+
+	// Test Listener unstarted Addr() and bind collision
+	unstartedListener := NewListener("127.0.0.1:0", nil)
+	assert.Equal(t, "127.0.0.1:0", unstartedListener.Addr())
+	err = unstartedListener.Start()
+	require.NoError(t, err)
+	defer unstartedListener.Stop()
+
+	// Collision bind
+	collisionListener := NewListener(unstartedListener.Addr(), nil)
+	err = collisionListener.Start()
 	require.Error(t, err)
 }
 
@@ -255,7 +317,7 @@ func TestSNMP_ClientAndListener_Integration(t *testing.T) {
 
 	// 5. Test Listener receiving Inform
 	received := make(chan bool, 1)
-	listener := NewListener("127.0.0.1:18163", func(target string, oid string, val any, trigger string) {
+	listener := NewListener("127.0.0.1:0", func(target string, oid string, val any, trigger string) {
 		if trigger == "INFORM" {
 			select {
 			case received <- true:
@@ -268,7 +330,7 @@ func TestSNMP_ClientAndListener_Integration(t *testing.T) {
 	defer listener.Stop()
 
 	// Send Inform to listener
-	err = agent.SendInform("127.0.0.1:18163", []gosnmp.SnmpPDU{
+	err = agent.SendInform(listener.Addr(), []gosnmp.SnmpPDU{
 		{Name: ".1.3.6.1.2.1.2.2.1.8.1", Type: gosnmp.Integer, Value: 2},
 	})
 	require.NoError(t, err)
@@ -279,4 +341,34 @@ func TestSNMP_ClientAndListener_Integration(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Fatal("timed out waiting for Inform packet")
 	}
+
+	// 6. Test Listener.Addr and invalid packet skipping
+	assert.NotEmpty(t, listener.Addr())
+
+	// Send non-SNMP random bytes to listener (should be skipped cleanly)
+	rawConn, err := net.Dial("udp", listener.Addr())
+	require.NoError(t, err)
+	_, _ = rawConn.Write([]byte("random garbage non-snmp payload"))
+	_ = rawConn.Close()
+
+	// 7. Test Listener start on invalid address
+	badListener := NewListener("invalid-host-format:99999", nil)
+	err = badListener.Start()
+	require.Error(t, err)
+
+	// 8. Test Client error handling on unreachable host
+	badCli := NewClient(SNMPConfig{
+		Host:    "127.0.0.1",
+		Port:    19999, // Nothing listening
+		Timeout: 20 * time.Millisecond,
+		Retries: 0,
+	})
+	_, err = badCli.Get([]string{".1.3.6.1.2.1.1.1.0"})
+	require.Error(t, err)
+	_, err = badCli.BulkGet([]string{".1.3.6.1.2.1.2.2.1"}, 0, 1)
+	require.Error(t, err)
+	_, err = badCli.BulkWalk(".1.3.6.1.2.1.2.2.1")
+	require.Error(t, err)
+	err = badCli.Set(".1.3.6.1.2.1.2.2.1.7.1", "int", 1)
+	require.Error(t, err)
 }

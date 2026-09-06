@@ -5,7 +5,7 @@ user-invocable: true
 license: Apache-2.0
 compatibility: Designed for Claude Code, Cursor, OpenCode, OpenClaw, and other AI coding agents.
 metadata:
-  author: [YOUR_NAME]
+  author: sh0jitmy
   version: "1.0.0"
   openclaw:
     emoji: "🧪"

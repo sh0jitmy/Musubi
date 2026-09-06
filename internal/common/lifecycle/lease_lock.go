@@ -1,4 +1,4 @@
-// Copyright 2026 [Copyright Holder]
+// Copyright 2026 Musubi Contributors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-// Author: [YOUR_NAME]
+// Author: sh0jitmy
 
 package lifecycle
 
@@ -143,6 +143,25 @@ func (m *Manager) IsDraining(target string) bool {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return m.draining[target]
+}
+
+// WaitForDrain blocks until the draining target has no active locks, or context is cancelled
+func (m *Manager) WaitForDrain(ctx context.Context, target string) error {
+	m.mu.Lock()
+	if !m.draining[target] || !m.isTargetLockedInternal(target) {
+		m.mu.Unlock()
+		return nil
+	}
+	ch := make(chan struct{})
+	m.drainWaiters[target] = append(m.drainWaiters[target], ch)
+	m.mu.Unlock()
+
+	select {
+	case <-ch:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 
 // ForceAbortTarget aborts all active jobs currently using the target and frees its locks

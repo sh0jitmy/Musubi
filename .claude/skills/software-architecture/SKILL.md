@@ -6,7 +6,7 @@ license: Apache-2.0
 compatibility: Designed for Claude Code, Cursor, OpenCode, OpenClaw, and other AI coding agents.
 allowed-tools: Read Edit Write Glob Grep Agent AskUserQuestion
 metadata:
-  author: [YOUR_NAME]
+  author: sh0jitmy
   version: "1.0.0"
 ---
 

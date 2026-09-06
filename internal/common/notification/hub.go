@@ -1,4 +1,4 @@
-// Copyright 2026 [Copyright Holder]
+// Copyright 2026 Musubi Contributors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-// Author: [YOUR_NAME]
+// Author: sh0jitmy
 
 package notification
 
@@ -54,12 +54,30 @@ func (h *Hub) Subscribe(topics []string) chan types.EventMessage {
 	return ch
 }
 
+// SubscriberCount returns the current number of active subscribers
+func (h *Hub) SubscriberCount() int {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	return len(h.subscribers)
+}
+
 // Unsubscribe removes a listener channel
 func (h *Hub) Unsubscribe(ch chan types.EventMessage) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
 	if _, ok := h.subscribers[ch]; ok {
+		delete(h.subscribers, ch)
+		close(ch)
+	}
+}
+
+// CloseAllSubscribers closes and removes all active subscribers
+func (h *Hub) CloseAllSubscribers() {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	for ch := range h.subscribers {
 		delete(h.subscribers, ch)
 		close(ch)
 	}

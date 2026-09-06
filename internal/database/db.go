@@ -1,4 +1,4 @@
-// Copyright 2026 [Copyright Holder]
+// Copyright 2026 Musubi Contributors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-// Author: [YOUR_NAME]
+// Author: sh0jitmy
 
 // Package database handles CGO-free sqlite and postgresql initialization, database connection pools,
 // schemas, automatic migrations, and data seeding using ent.
@@ -23,6 +23,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
+	"sync"
 
 	entsql "entgo.io/ent/dialect/sql"
 	sqlite "github.com/glebarez/go-sqlite"
@@ -31,6 +32,8 @@ import (
 	"github.com/sh0jitmy/musubi/ent/user"
 	"golang.org/x/crypto/bcrypt"
 )
+
+var migrationMu sync.Mutex
 
 func init() {
 	var found bool
@@ -77,10 +80,13 @@ func NewClient(ctx context.Context, driver, dsn string) (*ent.Client, error) {
 	drv := entsql.OpenDB(dialect, db)
 	client := ent.NewClient(ent.Driver(drv))
 
-	// 自動マイグレーションの実行
-	if err := client.Schema.Create(ctx); err != nil {
+	// 自動マイグレーションの実行 (Atlasのテーブル生成競合を防ぐため排他制御)
+	migrationMu.Lock()
+	migrationErr := client.Schema.Create(ctx)
+	migrationMu.Unlock()
+	if migrationErr != nil {
 		_ = db.Close()
-		return nil, fmt.Errorf("failed to apply automatic schema migration: %w", err)
+		return nil, fmt.Errorf("failed to apply automatic schema migration: %w", migrationErr)
 	}
 
 	return client, nil
