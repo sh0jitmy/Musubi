@@ -1,4 +1,4 @@
-// Copyright 2026 [Copyright Holder]
+// Copyright 2026 Musubi Contributors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-// Author: [YOUR_NAME]
+// Author: sh0jitmy
 
 package collector
 
@@ -161,7 +161,7 @@ func TestListener_StartStop(t *testing.T) {
 	t.Parallel()
 
 	var trapReceived bool
-	l := NewListener("127.0.0.1:18162", func(target string, oid string, val any, trigger string) {
+	l := NewListener("127.0.0.1:0", func(target string, oid string, val any, trigger string) {
 		trapReceived = true
 	})
 
@@ -257,8 +257,8 @@ func TestSNMP_ErrorPaths(t *testing.T) {
 	require.Error(t, err)
 
 	// Test Listener unstarted Addr() and bind collision
-	unstartedListener := NewListener("127.0.0.1:18165", nil)
-	assert.Equal(t, "127.0.0.1:18165", unstartedListener.Addr())
+	unstartedListener := NewListener("127.0.0.1:0", nil)
+	assert.Equal(t, "127.0.0.1:0", unstartedListener.Addr())
 	err = unstartedListener.Start()
 	require.NoError(t, err)
 	defer unstartedListener.Stop()
@@ -317,7 +317,7 @@ func TestSNMP_ClientAndListener_Integration(t *testing.T) {
 
 	// 5. Test Listener receiving Inform
 	received := make(chan bool, 1)
-	listener := NewListener("127.0.0.1:18163", func(target string, oid string, val any, trigger string) {
+	listener := NewListener("127.0.0.1:0", func(target string, oid string, val any, trigger string) {
 		if trigger == "INFORM" {
 			select {
 			case received <- true:
@@ -330,7 +330,7 @@ func TestSNMP_ClientAndListener_Integration(t *testing.T) {
 	defer listener.Stop()
 
 	// Send Inform to listener
-	err = agent.SendInform("127.0.0.1:18163", []gosnmp.SnmpPDU{
+	err = agent.SendInform(listener.Addr(), []gosnmp.SnmpPDU{
 		{Name: ".1.3.6.1.2.1.2.2.1.8.1", Type: gosnmp.Integer, Value: 2},
 	})
 	require.NoError(t, err)
@@ -343,7 +343,7 @@ func TestSNMP_ClientAndListener_Integration(t *testing.T) {
 	}
 
 	// 6. Test Listener.Addr and invalid packet skipping
-	assert.Contains(t, listener.Addr(), "18163")
+	assert.NotEmpty(t, listener.Addr())
 
 	// Send non-SNMP random bytes to listener (should be skipped cleanly)
 	rawConn, err := net.Dial("udp", listener.Addr())

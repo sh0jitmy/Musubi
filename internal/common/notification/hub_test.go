@@ -1,4 +1,4 @@
-// Copyright 2026 [Copyright Holder]
+// Copyright 2026 Musubi Contributors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-// Author: [YOUR_NAME]
+// Author: sh0jitmy
 
 package notification
 
@@ -36,6 +36,7 @@ func TestHub_PubSubAndGetSince(t *testing.T) {
 
 	ch := hub.Subscribe([]string{"target.status_changed", "job.step_advanced"})
 	assert.NotNil(t, ch)
+	assert.Equal(t, 1, hub.SubscriberCount())
 
 	hub.Publish("target.status_changed", map[string]string{"target": "spine1", "status": "ONLINE"})
 

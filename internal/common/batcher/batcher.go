@@ -1,4 +1,4 @@
-// Copyright 2026 [Copyright Holder]
+// Copyright 2026 Musubi Contributors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-// Author: [YOUR_NAME]
+// Author: sh0jitmy
 
 package batcher
 
@@ -38,6 +38,10 @@ type Batcher[T any] struct {
 
 // New creates and starts a new Batcher
 func New[T any](bufferSize int, flushInterval time.Duration, flushFn FlushFunc[T]) *Batcher[T] {
+	return newBatcher(bufferSize, flushInterval, flushFn, true)
+}
+
+func newBatcher[T any](bufferSize int, flushInterval time.Duration, flushFn FlushFunc[T], autoStart bool) *Batcher[T] {
 	b := &Batcher[T]{
 		flushFn:       flushFn,
 		bufferSize:    bufferSize,
@@ -47,9 +51,16 @@ func New[T any](bufferSize int, flushInterval time.Duration, flushFn FlushFunc[T
 	//nolint:gosec // b.cancel is stored and called during Batcher.Close()
 	b.ctx, b.cancel = context.WithCancel(context.Background())
 
+	if autoStart {
+		b.Start()
+	}
+	return b
+}
+
+// Start launches the background batch processing worker
+func (b *Batcher[T]) Start() {
 	b.wg.Add(1)
 	go b.run()
-	return b
 }
 
 // Push adds an item to the batch channel (non-blocking if not full)
@@ -84,22 +95,34 @@ func (b *Batcher[T]) run() {
 		_ = b.flushFn(context.Background(), items)
 	}
 
+	drain := func() {
+		for {
+			select {
+			case item := <-b.itemChan:
+				batch = append(batch, item)
+				if len(batch) >= b.bufferSize {
+					flush()
+				}
+			default:
+				flush()
+				return
+			}
+		}
+	}
+
 	for {
+		// Priority check: ensure cancellation takes precedence over queued channel inputs
 		select {
 		case <-b.ctx.Done():
-			// Drain remaining in itemChan
-			for {
-				select {
-				case item := <-b.itemChan:
-					batch = append(batch, item)
-					if len(batch) >= b.bufferSize {
-						flush()
-					}
-				default:
-					flush()
-					return
-				}
-			}
+			drain()
+			return
+		default:
+		}
+
+		select {
+		case <-b.ctx.Done():
+			drain()
+			return
 		case item := <-b.itemChan:
 			batch = append(batch, item)
 			if len(batch) >= b.bufferSize {

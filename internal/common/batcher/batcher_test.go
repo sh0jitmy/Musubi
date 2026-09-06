@@ -1,4 +1,4 @@
-// Copyright 2026 [Copyright Holder]
+// Copyright 2026 Musubi Contributors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-// Author: [YOUR_NAME]
+// Author: sh0jitmy
 
 package batcher
 
@@ -86,22 +86,27 @@ func TestBatcher_DrainOnClose(t *testing.T) {
 	var mu sync.Mutex
 	flushedItems := make([]int, 0)
 
-	b := New[int](2, 10*time.Second, func(ctx context.Context, items []int) error {
+	b := newBatcher[int](2, 10*time.Second, func(ctx context.Context, items []int) error {
 		mu.Lock()
 		flushedItems = append(flushedItems, items...)
 		mu.Unlock()
 		return nil
-	})
+	}, false)
 
-	// Cancel context to force worker into drain mode immediately
-	b.cancel()
-	// Send 3 items so drain loop accumulates >= bufferSize (2) and triggers flush in drain loop
+	// Pre-fill 3 items before worker starts
 	b.itemChan <- 10
 	b.itemChan <- 20
 	b.itemChan <- 30
+
+	// Cancel context to force worker into drain mode immediately upon start
+	b.cancel()
+
+	// Start worker now to drain all queued items
+	b.Start()
 	b.wg.Wait()
 
 	mu.Lock()
 	assert.Len(t, flushedItems, 3)
+	assert.Equal(t, []int{10, 20, 30}, flushedItems)
 	mu.Unlock()
 }

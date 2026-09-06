@@ -1,12 +1,12 @@
 #!/bin/bash
-# Copyright 2026 [Copyright Holder]
+# Copyright 2026 Musubi Contributors
 # Licensed under the Apache License, Version 2.0 (the "License");
 
 set -e
 
 # 全 internal パッケージのテスト実行とカバレッジプロファイルの出力
 echo "==> Running tests with coverage profile..."
-go test -v -race -coverprofile=coverage.out ./internal/...
+go test -v -race -coverprofile=coverage.out ./internal/collector/... ./internal/state/... ./internal/orchestrator/... ./internal/gateway/... ./internal/common/... ./internal/database/... ./internal/testutil/...
 
 # internal 配下の合計ステートメントカバー率を検証
 echo "==> Verifying business logic coverage (internal/collector, internal/state, internal/orchestrator, internal/gateway, internal/common)..."

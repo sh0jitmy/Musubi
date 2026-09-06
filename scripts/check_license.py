@@ -2,7 +2,7 @@ import os
 import sys
 import argparse
 
-LICENSE_HEADER = """// Copyright 2026 [Copyright Holder]
+LICENSE_HEADER = """// Copyright 2026 Musubi Contributors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@ LICENSE_HEADER = """// Copyright 2026 [Copyright Holder]
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-// Author: [YOUR_NAME]
+// Author: sh0jitmy
 """
 
 def get_go_files():

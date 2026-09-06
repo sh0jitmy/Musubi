@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2026 [Copyright Holder]
+# Copyright 2026 Musubi Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# Author: [YOUR_NAME]
+# Author: sh0jitmy
 
 # scripts/publish_pr.sh
 # 開発者がローカルで実行し、検証 (lint, test) -> git push -> gh pr create を一貫して行うスクリプト。

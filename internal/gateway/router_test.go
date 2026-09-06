@@ -1,4 +1,4 @@
-// Copyright 2026 [Copyright Holder]
+// Copyright 2026 Musubi Contributors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-// Author: [YOUR_NAME]
+// Author: sh0jitmy
 
 package gateway_test
 
@@ -26,6 +26,8 @@ import (
 	"net/http/httptest"
 	"path/filepath"
 	"strconv"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -1292,6 +1294,29 @@ steps:
 	time.Sleep(50 * time.Millisecond)
 }
 
+type safeRecorder struct {
+	*httptest.ResponseRecorder
+	mu sync.RWMutex
+}
+
+func newSafeRecorder() *safeRecorder {
+	return &safeRecorder{
+		ResponseRecorder: httptest.NewRecorder(),
+	}
+}
+
+func (r *safeRecorder) Write(buf []byte) (int, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.ResponseRecorder.Write(buf)
+}
+
+func (r *safeRecorder) String() string {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.Body.String()
+}
+
 func TestGateway_StreamEvents_SSE(t *testing.T) {
 	t.Parallel()
 	server := setupTestServer(t, "gw_sse")
@@ -1299,7 +1324,7 @@ func TestGateway_StreamEvents_SSE(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	w := httptest.NewRecorder()
+	w := newSafeRecorder()
 	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, "/v1/events/streams?topics=job.step_advanced,state.transition", nil)
 
 	done := make(chan bool)
@@ -1308,14 +1333,22 @@ func TestGateway_StreamEvents_SSE(t *testing.T) {
 		close(done)
 	}()
 
-	time.Sleep(20 * time.Millisecond)
+	// Wait for subscriber to be registered before publishing
+	require.Eventually(t, func() bool {
+		return server.Hub.SubscriberCount() > 0
+	}, 2*time.Second, 5*time.Millisecond)
+
 	server.Hub.Publish("job.step_advanced", "step-101")
-	time.Sleep(30 * time.Millisecond)
+
+	// Wait for message to be written to response buffer safely
+	require.Eventually(t, func() bool {
+		return strings.Contains(w.String(), "event: job.step_advanced")
+	}, 2*time.Second, 5*time.Millisecond)
 
 	cancel() // Cancel client context to terminate SSE loop cleanly
 	<-done
 
-	assert.Contains(t, w.Body.String(), "event: job.step_advanced")
+	assert.Contains(t, w.String(), "event: job.step_advanced")
 
 	// SSE channel close termination
 	wClosed := httptest.NewRecorder()
@@ -1326,17 +1359,21 @@ func TestGateway_StreamEvents_SSE(t *testing.T) {
 		close(doneClosed)
 	}()
 
-	time.Sleep(20 * time.Millisecond)
+	// Wait for subscriber to be registered before closing
+	require.Eventually(t, func() bool {
+		return server.Hub.SubscriberCount() > 0
+	}, 2*time.Second, 5*time.Millisecond)
+
 	server.Hub.CloseAllSubscribers()
 	select {
 	case <-doneClosed:
-	case <-time.After(500 * time.Millisecond):
+	case <-time.After(2 * time.Second):
 		t.Fatal("SSE handler did not exit after channel close")
 	}
 
 	// SSE keepalive ticker branch
 	server.SSEKeepAliveInterval = 10 * time.Millisecond
-	ctxKeepalive, cancelKeepalive := context.WithTimeout(context.Background(), 40*time.Millisecond)
+	ctxKeepalive, cancelKeepalive := context.WithTimeout(context.Background(), 300*time.Millisecond)
 	defer cancelKeepalive()
 	wKeepalive := httptest.NewRecorder()
 	reqKeepalive, _ := http.NewRequestWithContext(ctxKeepalive, http.MethodGet, "/v1/events/streams?topics=job.keepalive_test", nil)
