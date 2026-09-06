@@ -20,6 +20,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sh0jitmy/musubi/internal/common/types"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/goleak"
 )
@@ -61,5 +62,35 @@ func TestHub_PubSubAndGetSince(t *testing.T) {
 	sinceLogs := hub.GetSince(allLogs[0].ID)
 	assert.Len(t, sinceLogs, 1)
 
+	// GetSince for last message or non-existent ID -> nil
+	assert.Nil(t, hub.GetSince(allLogs[1].ID))
+	assert.Nil(t, hub.GetSince("non-existent-id"))
+
 	hub.Unsubscribe(ch)
+
+	// Test maxLogs eviction and subscriber buffer overflow drop
+	smallHub := NewHub(2)
+	_ = smallHub.Subscribe(nil) // All topics, buffer size 200
+
+	// Exceed maxLogs (2) to trigger eviction
+	smallHub.Publish("t1", "m1")
+	smallHub.Publish("t2", "m2")
+	smallHub.Publish("t3", "m3") // Evicts m1
+
+	logs := smallHub.GetSince("")
+	assert.Len(t, logs, 2)
+	assert.Equal(t, "t2", logs[0].Topic)
+	assert.Equal(t, "t3", logs[1].Topic)
+
+	// Direct channel with buffer size 1 to trigger non-blocking drop
+	smallHub.mu.Lock()
+	overflowCh := make(chan types.EventMessage, 1)
+	overflowCh <- types.EventMessage{ID: "prefill"}
+	smallHub.subscribers[overflowCh] = map[string]bool{"*": true}
+	smallHub.mu.Unlock()
+
+	// This publish will hit default case because overflowCh is full
+	smallHub.Publish("t4", "m4")
+
+	smallHub.CloseAllSubscribers()
 }

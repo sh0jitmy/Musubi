@@ -27,9 +27,26 @@ type Evaluator struct {
 	env *cel.Env
 }
 
+// Hooks for unit testing
+var (
+	celNewEnv  = cel.NewEnv
+	celProgram = func(env *cel.Env, ast *cel.Ast) (cel.Program, error) {
+		return env.Program(ast)
+	}
+)
+
+// SetCelNewEnvForTesting allows tests to mock cel.NewEnv. Returns a restore function.
+func SetCelNewEnvForTesting(fn func(opts ...cel.EnvOption) (*cel.Env, error)) func() {
+	old := celNewEnv
+	celNewEnv = fn
+	return func() {
+		celNewEnv = old
+	}
+}
+
 // NewEvaluator creates a new CEL evaluator
 func NewEvaluator() (*Evaluator, error) {
-	env, err := cel.NewEnv(
+	env, err := celNewEnv(
 		cel.Variable("raw", cel.MapType(cel.StringType, cel.MapType(cel.StringType, cel.AnyType))),
 		cel.Variable("derived", cel.MapType(cel.StringType, cel.AnyType)),
 		cel.Variable("inputs", cel.MapType(cel.StringType, cel.AnyType)),
@@ -47,7 +64,7 @@ func (e *Evaluator) Evaluate(expr string, raw map[string]map[string]any, derived
 		return false, fmt.Errorf("cel compile error: %w", iss.Err())
 	}
 
-	prg, err := e.env.Program(ast)
+	prg, err := celProgram(e.env, ast)
 	if err != nil {
 		return false, fmt.Errorf("cel program error: %w", err)
 	}

@@ -17,8 +17,10 @@
 package state
 
 import (
+	"fmt"
 	"testing"
 
+	"github.com/google/cel-go/cel"
 	"github.com/sh0jitmy/musubi/internal/common/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -100,8 +102,44 @@ func TestCELEvaluator_Evaluate(t *testing.T) {
 	_, err = eval.Evaluate("inputs['expected'] + 10", raw, derived, inputs)
 	require.Error(t, err)
 
+	// Runtime evaluation error (e.g. division by zero)
+	_, err = eval.Evaluate("1 / 0 == 0", raw, derived, inputs)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "cel eval error")
+
 	// Nil maps fallback test
 	resNil, err := eval.Evaluate("true", nil, nil, nil)
 	require.NoError(t, err)
 	assert.True(t, resNil)
+}
+
+//nolint:paralleltest // overrides package-level mock
+func TestEvaluator_NewEnvError(t *testing.T) {
+	restore := SetCelNewEnvForTesting(func(opts ...cel.EnvOption) (*cel.Env, error) {
+		return nil, fmt.Errorf("mocked new env error")
+	})
+	defer restore()
+
+	eval, err := NewEvaluator()
+	require.Error(t, err)
+	assert.Nil(t, eval)
+	assert.Contains(t, err.Error(), "mocked new env error")
+}
+
+//nolint:paralleltest // overrides package-level mock
+func TestEvaluator_ProgramError(t *testing.T) {
+	eval, err := NewEvaluator()
+	require.NoError(t, err)
+
+	oldProgram := celProgram
+	defer func() { celProgram = oldProgram }()
+
+	celProgram = func(env *cel.Env, ast *cel.Ast) (cel.Program, error) {
+		return nil, fmt.Errorf("mocked program error")
+	}
+
+	res, err := eval.Evaluate("true == true", nil, nil, nil)
+	require.Error(t, err)
+	assert.False(t, res)
+	assert.Contains(t, err.Error(), "mocked program error")
 }

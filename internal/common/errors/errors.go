@@ -52,6 +52,8 @@ func (p *ProblemDetails) Error() string {
 	return fmt.Sprintf("[%s] %s: %s (status: %d)", p.Code, p.Title, p.Detail, p.Status)
 }
 
+var jsonUnmarshal = json.Unmarshal
+
 // MarshalJSON custom serializer
 func (p *ProblemDetails) MarshalJSON() ([]byte, error) {
 	type Alias ProblemDetails
@@ -63,7 +65,7 @@ func (p *ProblemDetails) MarshalJSON() ([]byte, error) {
 		return raw, nil
 	}
 	var m map[string]any
-	if err := json.Unmarshal(raw, &m); err != nil {
+	if err := jsonUnmarshal(raw, &m); err != nil {
 		return nil, err
 	}
 	for k, v := range p.Extra {

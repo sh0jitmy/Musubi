@@ -83,3 +83,57 @@ func TestLifecycleManager_DrainingAndAbort(t *testing.T) {
 	abortedCount := mgr.ForceAbortTarget("spine2")
 	assert.Equal(t, 1, abortedCount)
 }
+
+func TestLifecycleManager_WaitForDrain(t *testing.T) {
+	t.Parallel()
+
+	mgr := NewManager()
+
+	// 1. Not draining -> immediate return
+	err := mgr.WaitForDrain(context.Background(), "spine1")
+	require.NoError(t, err)
+
+	// 2. Draining but not locked -> immediate return
+	mgr.SetDraining("spine1")
+	err = mgr.WaitForDrain(context.Background(), "spine1")
+	require.NoError(t, err)
+
+	// 3. Locked, then draining -> wait until released
+	mgr2 := NewManager()
+	err = mgr2.AcquireLocks("job-drain-1", []string{"spine2"}, 1*time.Minute)
+	require.NoError(t, err)
+	mgr2.SetDraining("spine2")
+
+	doneCh := make(chan error, 1)
+	go func() {
+		doneCh <- mgr2.WaitForDrain(context.Background(), "spine2")
+	}()
+
+	select {
+	case <-doneCh:
+		t.Fatal("WaitForDrain should block while lock is held")
+	case <-time.After(50 * time.Millisecond):
+	}
+
+	// Release lock -> waiter should unblock
+	mgr2.ReleaseLocks("job-drain-1")
+
+	select {
+	case resErr := <-doneCh:
+		require.NoError(t, resErr)
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("WaitForDrain timed out after ReleaseLocks")
+	}
+
+	// 4. Locked, draining, and context cancelled
+	mgr3 := NewManager()
+	err = mgr3.AcquireLocks("job-drain-2", []string{"spine3"}, 1*time.Minute)
+	require.NoError(t, err)
+	mgr3.SetDraining("spine3")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+
+	err = mgr3.WaitForDrain(ctx, "spine3")
+	assert.ErrorIs(t, err, context.DeadlineExceeded)
+}

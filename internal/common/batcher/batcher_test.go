@@ -79,3 +79,29 @@ func TestBatcher_BufferFullTrigger(t *testing.T) {
 	assert.Equal(t, 6, flushedCount)
 	mu.Unlock()
 }
+
+func TestBatcher_DrainOnClose(t *testing.T) {
+	t.Parallel()
+
+	var mu sync.Mutex
+	flushedItems := make([]int, 0)
+
+	b := New[int](2, 10*time.Second, func(ctx context.Context, items []int) error {
+		mu.Lock()
+		flushedItems = append(flushedItems, items...)
+		mu.Unlock()
+		return nil
+	})
+
+	// Cancel context to force worker into drain mode immediately
+	b.cancel()
+	// Send 3 items so drain loop accumulates >= bufferSize (2) and triggers flush in drain loop
+	b.itemChan <- 10
+	b.itemChan <- 20
+	b.itemChan <- 30
+	b.wg.Wait()
+
+	mu.Lock()
+	assert.Len(t, flushedItems, 3)
+	mu.Unlock()
+}

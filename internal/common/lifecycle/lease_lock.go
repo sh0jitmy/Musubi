@@ -145,6 +145,25 @@ func (m *Manager) IsDraining(target string) bool {
 	return m.draining[target]
 }
 
+// WaitForDrain blocks until the draining target has no active locks, or context is cancelled
+func (m *Manager) WaitForDrain(ctx context.Context, target string) error {
+	m.mu.Lock()
+	if !m.draining[target] || !m.isTargetLockedInternal(target) {
+		m.mu.Unlock()
+		return nil
+	}
+	ch := make(chan struct{})
+	m.drainWaiters[target] = append(m.drainWaiters[target], ch)
+	m.mu.Unlock()
+
+	select {
+	case <-ch:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
 // ForceAbortTarget aborts all active jobs currently using the target and frees its locks
 func (m *Manager) ForceAbortTarget(target string) int {
 	m.mu.Lock()

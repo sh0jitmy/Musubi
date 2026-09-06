@@ -65,6 +65,17 @@ func (h *Hub) Unsubscribe(ch chan types.EventMessage) {
 	}
 }
 
+// CloseAllSubscribers closes and removes all active subscribers
+func (h *Hub) CloseAllSubscribers() {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	for ch := range h.subscribers {
+		delete(h.subscribers, ch)
+		close(ch)
+	}
+}
+
 // Publish broadcasts an event to matching subscribers
 func (h *Hub) Publish(topic string, payload any) {
 	h.mu.Lock()

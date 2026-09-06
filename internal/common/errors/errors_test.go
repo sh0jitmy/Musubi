@@ -18,6 +18,7 @@ package errors
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"testing"
 
@@ -58,7 +59,40 @@ func TestDomainErrors(t *testing.T) {
 
 	// Extra fields marshal
 	inUse := ErrTargetInUse("spine1", "job-1")
-	raw, err := json.Marshal(inUse)
+	b, err := json.Marshal(inUse)
 	require.NoError(t, err)
-	assert.Contains(t, string(raw), "locked_by_job_id")
+	assert.Contains(t, string(b), "locked_by_job_id")
+
+	// Empty extra fields marshal
+	noExtra := NewNotFound("not found", "NOT_FOUND", "/v1/test")
+	b, err = json.Marshal(noExtra)
+	require.NoError(t, err)
+	assert.Contains(t, string(b), "NOT_FOUND")
+
+	// Unmarshalable value in InvalidParams to trigger Marshal error
+	unmarshalable := &ProblemDetails{
+		InvalidParams: []map[string]any{
+			{"chan": make(chan int)},
+		},
+	}
+	_, err = json.Marshal(unmarshalable)
+	require.Error(t, err)
+}
+
+//nolint:paralleltest // overrides package-level mock
+func TestProblemDetails_UnmarshalError(t *testing.T) {
+	oldUnmarshal := jsonUnmarshal
+	defer func() { jsonUnmarshal = oldUnmarshal }()
+
+	jsonUnmarshal = func(data []byte, v any) error {
+		return fmt.Errorf("forced unmarshal error")
+	}
+
+	p := &ProblemDetails{
+		Title: "Test",
+		Extra: map[string]any{"key": "val"},
+	}
+	_, err := json.Marshal(p)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "forced unmarshal error")
 }
