@@ -1,5 +1,9 @@
 # Changelog
 
+## [v0.0.5](https://github.com/sh0jitmy/Musubi/compare/v0.0.4...v0.0.5) - 2026-09-06
+
+- feat: configure multiple build targets and update archive formats in goreleaser configuration by @sh0jitmy in https://github.com/sh0jitmy/Musubi/pull/25
+
 ## [v0.0.4](https://github.com/sh0jitmy/Musubi/compare/v0.0.3...v0.0.4) - 2026-09-06
 
 - feat: implement ad-hoc scenario execution and enhance integration testing with PCAP recording support by @sh0jitmy in https://github.com/sh0jitmy/Musubi/pull/22
