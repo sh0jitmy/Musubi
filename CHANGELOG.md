@@ -1,5 +1,11 @@
 # Changelog
 
+## [v0.0.6](https://github.com/sh0jitmy/Musubi/compare/v0.0.5...v0.0.6) - 2026-09-13
+
+- feat: add application configuration and database backup/restore function by @sh0jitmy in https://github.com/sh0jitmy/Musubi/pull/29
+- chore(deps): bump golang.org/x/crypto from 0.55.0 to 0.56.0 by @dependabot[bot] in https://github.com/sh0jitmy/Musubi/pull/28
+- chore(deps): bump Songmu/tagpr from 1.20.2 to 1.20.3 by @dependabot[bot] in https://github.com/sh0jitmy/Musubi/pull/27
+
 ## [v0.0.5](https://github.com/sh0jitmy/Musubi/compare/v0.0.4...v0.0.5) - 2026-09-06
 
 - feat: configure multiple build targets and update archive formats in goreleaser configuration by @sh0jitmy in https://github.com/sh0jitmy/Musubi/pull/25
