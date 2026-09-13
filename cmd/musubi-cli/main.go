@@ -58,6 +58,7 @@ func main() {
 			auditCommand(),
 			systemCommand(),
 			maintenanceCommand(),
+			backupCommand(),
 		},
 	}
 
@@ -270,6 +271,24 @@ func systemCommand() *cli.Command {
 				},
 			},
 			{
+				Name:  "restore",
+				Usage: "Restore system from backup archive",
+				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Name:     "archive",
+						Aliases:  []string{"a"},
+						Required: true,
+						Usage:    "Path to backup archive (.tar.gz)",
+					},
+				},
+				Action: func(c *cli.Context) error {
+					payload := map[string]any{
+						"archive_path": c.String("archive"),
+					}
+					return httpPost(c, "/v1/system/restores", payload)
+				},
+			},
+			{
 				Name:  "purge",
 				Usage: "Purge expired logs (state transitions, jobs, audit logs)",
 				Flags: []cli.Flag{
@@ -302,6 +321,46 @@ func maintenanceCommand() *cli.Command {
 						"days": c.Int("days"),
 					}
 					return httpPost(c, "/v1/system/purge", payload)
+				},
+			},
+		},
+	}
+}
+
+func backupCommand() *cli.Command {
+	return &cli.Command{
+		Name:  "backup",
+		Usage: "Backup and restore operations",
+		Subcommands: []*cli.Command{
+			{
+				Name:  "create",
+				Usage: "Create full system backup",
+				Action: func(c *cli.Context) error {
+					return httpPost(c, "/v1/system/backups", nil)
+				},
+			},
+			{
+				Name:  "restore",
+				Usage: "Restore system from backup archive",
+				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Name:    "archive",
+						Aliases: []string{"a"},
+						Usage:   "Path to backup archive (.tar.gz)",
+					},
+				},
+				Action: func(c *cli.Context) error {
+					archive := c.String("archive")
+					if archive == "" && c.NArg() > 0 {
+						archive = c.Args().First()
+					}
+					if archive == "" {
+						return fmt.Errorf("archive path required")
+					}
+					payload := map[string]any{
+						"archive_path": archive,
+					}
+					return httpPost(c, "/v1/system/restores", payload)
 				},
 			},
 		},

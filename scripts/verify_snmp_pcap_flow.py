@@ -145,6 +145,15 @@ def print_frames(title, pcap_path):
     return len(frames)
 
 def main():
+    if len(sys.argv) > 1 and os.path.exists(sys.argv[1]):
+        pcap_target = sys.argv[1]
+        print("=" * 110)
+        print(f"🚀 Inspecting PCAP File: {os.path.abspath(pcap_target)}")
+        print("=" * 110)
+        count = print_frames("Custom PCAP File", pcap_target)
+        print(f"\n[+] Successfully parsed {count} frames from {pcap_target}")
+        return
+
     print("=" * 110)
     print("🚀 Musubi SNMP E2E & PCAP Comprehensive Protocol Flow Verifier")
     print("=" * 110)

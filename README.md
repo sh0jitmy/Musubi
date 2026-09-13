@@ -14,6 +14,8 @@
 ## 🌟 主な特徴 (Key Features)
 
 * 🔒 **Air-gapped ＆ ゼロ外部依存設計**: インターネット接続のない隔離ラボ環境でも、単一バイナリおよび Docker Compose で完結稼働。
+* 💾 **SQLite / PostgreSQL 柔軟切り替え**: Docker や外部 DB 不要で SQLite による完全スタンドアロン自律稼働が可能。設定 (`config.yaml`) や環境変数で本番 PostgreSQL と容易に切り替え。
+* 📦 **高信頼バックアップ ＆ リストア**: 全エンティティ（設定・認証・シナリオ・実行履歴・ログ）を SHA-256 チェックサム付き `.tar.gz` で瞬時に出力・復元。インプロセス定期バックアップと世代ローテーションも標準装備。
 * ⚡ **ミリ秒級のイベント駆動アーキテクチャ**: ポーリング待ちによるタイムラグを排し、SNMP Trap / Inform 受信と同時に CEL 条件評価を実行してシナリオを即座に進捗。
 * 📐 **CEL (Common Expression Language) による宣言的評価**: `raw['spine1']['IF-MIB::ifOperStatus.1'] == 'up'` のような直感的で高速・型安全な条件判定。
 * 🛡️ **Lease Lock によるターゲット保護**: 複数エンジニアや並行テストによるターゲット機器の競合や誤設定変更を自動でブロック。
@@ -140,27 +142,49 @@ curl -s http://localhost:8080/v1/system/healths | jq .
 
 ---
 
-### 2. ワンコマンド デモスクリプトの実行
+### 2. Docker 不要！SQLite モードでのスタンドアロン即時起動
 
-スタックの起動から、認証プロファイル作成、ターゲット登録、シナリオ登録、ジョブ実行までを完全自動で体験できます：
-
-```bash
-./scripts/demo.sh
-```
-
----
-
-### 3. ローカルバイナリのビルドと起動
+Docker や外部 PostgreSQL をインストールできない環境でも、Musubi は SQLite 単体で完全自律動作します。
 
 ```bash
 # 全バイナリを bin/ に一括ビルド
 make build
 
-# サーバーの起動 (ポート 8080, UDP 162 でリスン)
+# 設定ファイルを作成 (必要に応じて編集。無指定でもデフォルト SQLite で即起動)
+cp config.example.yaml config.yaml
+
+# サーバーの起動 (デフォルト: ./data/musubi.db を自動初期化・マイグレーション)
 ./bin/musubi-server
 
-# CLI ヘルプの確認
+# 別ターミナルで Mock SNMP Agent を起動 (検証用)
+./bin/mock-snmp-agent
+
+# CLI ヘルプおよびサーバー疎通の確認
 ./bin/musubi-cli --help
+curl -s http://localhost:8080/v1/system/healthz
+```
+
+> [!TIP]
+> **PostgreSQL との切り替え**: `config.yaml` 内の `database.driver: "postgres"` と `database.dsn: "postgres://..."` を指定するか、環境変数 `DATABASE_DRIVER=postgres DATABASE_DSN="postgres://user:pass@host:5432/musubi?sslmode=disable"` を渡すだけで、コードの再ビルドなしにシームレスに切り替えられます。
+
+---
+
+### 3. Docker 不要 E2E 自動テストスイートの実行
+
+純 Go スタック（Musubi Server + Mock SNMP Agent + CLI）により、Docker なしでシナリオ実行・障害注入・バックアップ＆リストア復元までの E2E テストを瞬時に検証できます：
+
+```bash
+make sqlite-e2e
+```
+
+---
+
+### 4. ワンコマンド デモスクリプトの実行 (Docker 環境)
+
+スタックの起動から、認証プロファイル作成、ターゲット登録、シナリオ登録、ジョブ実行までを完全自動で体験できます：
+
+```bash
+./scripts/demo.sh
 ```
 
 ---
@@ -283,6 +307,26 @@ curl -X POST http://localhost:8080/v1/scenarios/adhoc \
 }
 ```
 
+### ステップ 5: システムバックアップ ＆ トランザクションリストア
+
+全ターゲット、認証情報、シナリオ定義、バージョン履歴、Job 履歴、監査ログなどの全エンティティを、SHA-256 チェックサム付き `.tar.gz` アーカイブとしてバックアップおよび復元可能です。
+
+```bash
+# 1. バックアップの作成 (CLI)
+./bin/musubi-cli backup create --output ./my-backup.tar.gz
+
+# または REST API 経由でのバックアップ作成 & ダウンロード
+BACKUP_INFO=$(curl -s -X POST http://localhost:8080/v1/system/backups)
+DOWNLOAD_URL=$(echo "$BACKUP_INFO" | jq -r .download_url)
+curl -s -O "http://localhost:8080${DOWNLOAD_URL}"
+
+# 2. バックアップからの復元 (トランザクション内で既存データを安全に置換)
+./bin/musubi-cli backup restore --archive ./my-backup.tar.gz
+```
+
+> [!NOTE]
+> `config.yaml` の `backup.enabled: true`（デフォルト有効）により、設定されたインターバル（デフォルト 1時間）で自動バックアップと世代数ローテーション（最新 7 世代保持）がバックグラウンドで自律実行されます。
+
 ---
 
 ## 📊 Grafana モニタリングダッシュボード & 対話型リアルタイム検索
@@ -366,6 +410,7 @@ make benchmark
 | `make benchmark` | 大規模 MIB 反映 (2048 OID) & 12 Agent 並列負荷ベンチマーク実行とレポート生成 |
 | `make build` | `bin/` 配下への全実行可能バイナリ (`musubi-server`, `musubi-cli`, `mock-snmp-agent`) コンパイル |
 | `make docker-test` | Docker Compose 環境での E2E 自動検証スクリプト実行 |
+| `make sqlite-e2e` | Docker 不要の純 Go スタック（SQLite + Mock Agent）による E2E 自動検証スクリプト実行 |
 | `make openapi-lint` | Spectral による OpenAPI 3.1 スキーマ文法検証 |
 | `make clean` | 一時ファイル、バイナリ成果物、テストキャッシュの削除 |
 

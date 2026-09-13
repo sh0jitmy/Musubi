@@ -1150,6 +1150,38 @@ paths:
               schema:
                 $ref: '#/components/schemas/RestoreResponse'
 
+  /v1/system/downloads/{filename}:
+    get:
+      summary: Download Backup Archive
+      description: Download system backup tar.gz archive.
+      operationId: downloadBackup
+      tags:
+        - Audit
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: filename
+          in: path
+          required: true
+          description: Backup archive filename
+          schema:
+            type: string
+            example: musubi-backup-20260914-120000.tar.gz
+      responses:
+        '200':
+          description: Backup archive gzip stream
+          content:
+            application/gzip:
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: Backup archive file not found
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+
   /v1/system/healthz:
     get:
       summary: Liveness Probe
