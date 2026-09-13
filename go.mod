@@ -8,7 +8,7 @@ require (
 	github.com/glebarez/go-sqlite v1.23.0
 	github.com/google/cel-go v0.31.0
 	github.com/gosnmp/gosnmp v1.44.0
-	github.com/jackc/pgx/v5 v5.10.0
+	github.com/jackc/pgx/v5 v5.11.0
 	github.com/prometheus/client_golang v1.24.1
 	github.com/stretchr/testify v1.12.1
 	github.com/urfave/cli/v2 v2.27.7
