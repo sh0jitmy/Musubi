@@ -130,7 +130,15 @@ func (m *MockAgent) port() int {
 
 // Start binds to a free UDP port and starts serving
 func (m *MockAgent) Start() (string, error) {
-	addr, err := net.ResolveUDPAddr("udp", "127.0.0.1:0")
+	return m.StartAt("127.0.0.1:0")
+}
+
+// StartAt binds to the specified UDP address and starts serving
+func (m *MockAgent) StartAt(bindAddr string) (string, error) {
+	if bindAddr == "" {
+		bindAddr = "127.0.0.1:0"
+	}
+	addr, err := net.ResolveUDPAddr("udp", bindAddr)
 	if err != nil {
 		return "", err
 	}

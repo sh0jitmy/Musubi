@@ -750,19 +750,18 @@ Musubi は、**「モジュラーモノリス（開発・ラップトップ標�
 
 エアギャップ閉域網環境での安全な運用保守・障害復旧（DR）のため、以下の運用機能を標準提供します。
 
-#### 1. フルシステムバックアップ ＆ リストア (`musubi-cli` 統合)
+#### 1. フルシステムバックアップ ＆ トランザクションリストア (`musubi-cli` 統合)
 - **バックアップコマンド**:
   ```bash
-  musubi-cli backup create --output /var/backups/musubi-20260814.tar.gz
+  musubi-cli backup create --output /var/backups/musubi-20260914.tar.gz
   ```
-  - PostgreSQL 論理ダンプ（シナリオ定義、ターゲット、認証情報、全ログテーブル）。
-  - ローカル設定ファイル（`config.yaml`、Casbin `rbac_policy.csv`）。
-  - カスタム MIB ファイル群（`/etc/musubi/mibs/`）。
+  - 全エンティティ（シナリオ定義、バージョン履歴、ターゲット、認証プロファイル、Job実行履歴、Step結果、状態遷移ログ、監査ログ）を SHA-256 チェックサム付き `.tar.gz` としてアーカイブ。
+  - REST API `POST /v1/system/backups` およびダウンロード `GET /v1/system/downloads/:filename` にも完全対応。
 - **リストアコマンド**:
   ```bash
-  musubi-cli restore apply /var/backups/musubi-20260814.tar.gz --clean
+  musubi-cli backup restore --archive /var/backups/musubi-20260914.tar.gz
   ```
-  - トランザクション内で既存データを安全に置き換え、整合性を検証して復元。
+  - 事前 SHA-256 検証と単一トランザクション内で既存データを安全に置換・復元。エラー時は即座に自動ロールバック。
 
 #### 2. シナリオ定義の GitOps 一括エクスポート & インポート
 - **REST API / CLI 連携**:
@@ -1315,30 +1314,29 @@ cd musubi-v1.0.0-bundle
 
 #### 1. バックアップ対象とデータ形式
 - **対象データ**:
-  1. PostgreSQL 論理ダンプ（シナリオ、バージョン、実行Job履歴、Step実行結果、ターゲット、認証プロファイル、状態遷移ログ、監査ログ）。
-  2. アプリケーション設定（`config.yaml`、Casbin `rbac_model.conf`、`rbac_policy.csv`）。
-  3. MIB ツリー・カスタム MIB 定義ファイル群（`/etc/musubi/mibs/`）。
-- **完全性保証**: バックアップアーカイブ作成時に SHA-256 チェックサムファイル（`checksum.sha256`）を自動生成。
+  - Ent ORM を通じた全 9 エンティティ（Users, CredentialProfiles, Targets, Scenarios, ScenarioVersions, Jobs, JobSteps, StateTransitionLogs, AuditLogs）の完全な JSON シリアライズ（機密認証パスフレーズ含む）。
+  - SQLite および PostgreSQL の両環境で完全に共通のアーカイブフォーマット。
+- **完全性保証**: バックアップアーカイブ（`.tar.gz`）内に `manifest.json`、`data.json`、および SHA-256 チェックサムファイル（`checksum.sha256`）を同梱。リストア時に自動検証。
 
 #### 2. バックアップ実行モード
-- **① 手動バックアップ (CLI & REST API)**:
+- **① オンデマンド・バックアップ (CLI & REST API)**:
   ```bash
-  musubi-cli backup create --output /var/backups/musubi-20260814.tar.gz --include-logs
+  musubi-cli backup create --output /var/backups/musubi-20260914.tar.gz
   ```
-  - REST API: `POST /api/v1/system/backup`
+  - REST API: `POST /v1/system/backups`（生成後に `download_url` を返却）
+  - アーカイブダウンロード: `GET /v1/system/downloads/:filename`（パストラバーサル防止ガード付き）
 - **② 定期自動バックアップ (Scheduled Backup)**:
-  - `config.yaml` 内の cron 式（例: 毎日 02:00）で `internal/backup` が自動実行。
-  - **世代管理ポリシー**: 日次バックアップ 7 世代、週次バックアップ 4 世代を自動ローテーション保持。
+  - `config.yaml`（`backup.enabled: true`, `backup.interval: 1h`, `backup.dir: ./backups`, `backup.max_keep: 7`）により、`internal/database/backup.go:StartBackgroundBackup` ワーカーが自律稼働。
+  - **世代管理ポリシー**: `backup.max_keep` を超えた古いアーカイブを自動ローテーション削除。
 
 #### 3. 安全なトランザクション・リストア手順
 ```bash
-musubi-cli backup restore /var/backups/musubi-20260814.tar.gz --clean
+musubi-cli backup restore --archive /var/backups/musubi-20260914.tar.gz
 ```
 - **リストア検証シーケンス**:
-  1. **SHA-256 チェックサム検証**: アーカイブ破損・改ざんの有無を事前検査。
-  2. **スキーマバージョン互換性チェック**: 現在のバイナリの Ent スキーマとバックアップメタデータの整合性を確認。
-  3. **トランザクション内リストア**: DB 復元を単一トランザクション内で実行し、途中でエラーが発生した場合は即座に自動ロールバック。
-  4. **設定 & MIB ファイルの同期展開**: MIB テーブルの再構築と Casbin ポリシーのリロード。
+  1. **SHA-256 チェックサム検証**: アーカイブ内の `data.json` の SHA-256 ハッシュを計算し、`checksum.sha256` と完全一致するか事前検査（不一致や破損時は即座にエラー）。
+  2. **スキーマバージョン整合性チェック**: `manifest.json` のスキーマバージョンとメタデータを確認。
+  3. **単一トランザクション内リストア**: 既存データのクリーンアップと全エンティティのインポートを同一トランザクション内で実行。万一エラーが発生した場合は自動的にロールバックされ、データ不整合やデータ消失を防止。
 
 ---
 
@@ -1598,8 +1596,9 @@ OpenAPI 3.1 駆動開発に基づき、フロントエンドおよび外部 CI/C
 | :--- | :--- | :--- | :--- | :--- |
 | `GET` | `/api/v1/audit/logs` | 操作監査ログ一覧取得 | クエリ: `?from=...&to=...&user_id=...` | **200 OK** |
 | `GET` | `/api/v1/audit/export` | **一括監査証跡パッケージダウンロード** | 全操作ログ・Job 証跡・SHA-256 署名を内包した zip 出力 | **200 OK** (`Content-Type: application/zip`) |
-| `POST` | `/api/v1/system/backup` | フルシステムバックアップ作成 | PostgreSQL・設定・MIB をアーカイブした tar.gz 出力 | **200 OK** (`Content-Type: application/gzip`) |
-| `POST` | `/api/v1/system/restore` | フルシステムリストア適用 | バックアップアーカイブのトランザクション内復元 | **200 OK** (`{ restored: true }`) |
+| `POST` | `/v1/system/backups` | フルシステムバックアップ作成 | 全エンティティを tar.gz アーカイブ化しメタデータと download_url 返却 | **200 OK** (`application/json`) |
+| `GET` | `/v1/system/downloads/:filename` | バックアップアーカイブダウンロード | パストラバーサル防止ガード付きの gzip ストリームダウンロード | **200 OK** (`Content-Type: application/gzip`) |
+| `POST` | `/v1/system/restores` | フルシステムリストア適用 | バックアップアーカイブの検証およびトランザクション内復元 | **200 OK** (`{ restored: true }`) |
 | `GET` | `/healthz` | プロセス死活監視 (Liveness) | HTTP 200 でプロセス生存確認 | **200 OK** |
 | `GET` | `/readyz` | 依存コンポーネント監視 (Readiness) | DB 疎通、UDP 162 バインド、Poller 稼働確認 | **200 OK** / 503 Service Unavailable |
 | `GET` | `/api/v1/system/health` | システム詳細ヘルス (Deep Health) | DB コネクション数、UDP ドロップ数、バッチキュー滞留率 | **200 OK** |

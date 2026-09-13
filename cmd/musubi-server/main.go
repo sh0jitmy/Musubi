@@ -22,13 +22,13 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
-	"strconv"
 	"syscall"
 	"time"
 
 	_ "github.com/glebarez/go-sqlite"
 	"github.com/sh0jitmy/musubi/ent/target"
 	"github.com/sh0jitmy/musubi/internal/collector"
+	"github.com/sh0jitmy/musubi/internal/common/config"
 	"github.com/sh0jitmy/musubi/internal/common/notification"
 	"github.com/sh0jitmy/musubi/internal/common/types"
 	"github.com/sh0jitmy/musubi/internal/database"
@@ -43,17 +43,14 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	dbDriver := os.Getenv("DATABASE_DRIVER")
-	if dbDriver == "" {
-		dbDriver = "sqlite3"
-	}
-	dbDSN := os.Getenv("DATABASE_DSN")
-	if dbDSN == "" {
-		dbDSN = "musubi.db?_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)"
+	cfg, err := config.Load("")
+	if err != nil {
+		slog.Warn("Could not load config file, proceeding with defaults and environment variables", "error", err)
+		cfg = config.DefaultConfig()
 	}
 
-	slog.Info("Initializing database connection", "driver", dbDriver)
-	client, err := database.NewClient(ctx, dbDriver, dbDSN)
+	slog.Info("Initializing database connection", "driver", cfg.Database.Driver)
+	client, err := database.NewClient(ctx, cfg.Database.Driver, cfg.Database.DSN)
 	if err != nil {
 		slog.Error("Failed to initialize database", "error", err)
 		os.Exit(1)
@@ -67,19 +64,18 @@ func main() {
 	}
 
 	// Start in-process Log Retention Cleaner Worker (no OS cron needed)
-	retentionHours := 24
-	if rh := os.Getenv("RETENTION_INTERVAL_HOURS"); rh != "" {
-		if val, convErr := strconv.Atoi(rh); convErr == nil && val > 0 {
-			retentionHours = val
-		}
+	database.StartBackgroundCleaner(ctx, client, time.Duration(cfg.Retention.IntervalHours)*time.Hour, cfg.Retention.Days)
+
+	// Start in-process Scheduled Backup Worker
+	if cfg.Backup.Enabled {
+		database.StartBackgroundBackup(
+			ctx,
+			client,
+			time.Duration(cfg.Backup.IntervalHours)*time.Hour,
+			cfg.Backup.Directory,
+			cfg.Backup.RetentionCount,
+		)
 	}
-	retentionDays := 30
-	if rd := os.Getenv("RETENTION_DAYS"); rd != "" {
-		if val, convErr := strconv.Atoi(rd); convErr == nil && val > 0 {
-			retentionDays = val
-		}
-	}
-	database.StartBackgroundCleaner(ctx, client, time.Duration(retentionHours)*time.Hour, retentionDays)
 
 	hub := notification.NewHub(1000)
 
@@ -101,9 +97,9 @@ func main() {
 	})
 
 	// Start SNMP Trap / Inform listener
-	trapPort := os.Getenv("SNMP_TRAP_PORT")
-	if trapPort == "" {
-		trapPort = "162"
+	trapPort := cfg.Server.TrapPort
+	if tp := os.Getenv("SNMP_TRAP_PORT"); tp != "" {
+		trapPort = tp
 	}
 	trapAddr := fmt.Sprintf(":%s", trapPort)
 	trapListener := collector.NewListener(trapAddr, func(targetHost string, oid string, val any, trigger string) {
@@ -130,13 +126,14 @@ func main() {
 		slog.Error("Failed to initialize gateway server", "error", err)
 		os.Exit(1)
 	}
+	server.BackupDir = cfg.Backup.Directory
 
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
+	port := cfg.Server.Port
+	if p := os.Getenv("PORT"); p != "" {
+		port = p
 	}
 
-	slog.Info("Starting Musubi server", "port", port)
+	slog.Info("Starting Musubi server", "port", port, "backup_dir", cfg.Backup.Directory)
 	go func() {
 		if err := server.Engine.Run(fmt.Sprintf(":%s", port)); err != nil {
 			slog.Error("Server error", "error", err)

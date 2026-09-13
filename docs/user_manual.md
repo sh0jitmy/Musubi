@@ -10,6 +10,10 @@
 
 1. [Musubi の概要と基本コンセプト](#1-musubi-の概要と基本コンセプト)
 2. [クイックスタート & 環境構築](#2-クイックスタート--環境構築)
+   - 2.1 [前提条件](#21-前提条件)
+   - 2.2 [Docker Compose による即時起動 (推奨)](#22-docker-compose-による即時起動-推奨)
+   - 2.3 [Docker 不要！SQLite モードでのスタンドアロン起動 & 設定管理](#23-docker-不要sqlite-モードでのスタンドアロン起動--設定管理)
+   - 2.4 [Docker 不要 E2E 自動検証スクリプトの実行](#24-docker-不要-e2e-自動検証スクリプトの実行)
 3. [認証プロファイルとターゲット機器の管理](#3-認証プロファイルとターゲット機器の管理)
 4. [シナリオ作成パーフェクトガイド (DSL & CEL 仕様)](#4-シナリオ作成パーフェクトガイド-dsl--cel-仕様)
 5. [シナリオの登録・実行・進捗監視・オンデマンド実行](#5-シナリオの登録実行進捗監視オンデマンド実行)
@@ -20,6 +24,10 @@
    - 5.5 [オンデマンド・ワンショット シナリオ直接実行 (Ad-hoc Execution)](#55-オンデマンドワンショット-シナリオ直接実行-ad-hoc-execution)
 6. [Grafana ダッシュボードによるリアルタイム監視](#6-grafana-ダッシュボードによるリアルタイム監視)
 7. [運用・保守・ライフサイクル管理](#7-運用保守ライフサイクル管理)
+   - 7.1 [定期ログパージ & 保持期間管理](#71-定期ログパージ--保持期間管理)
+   - 7.2 [孤立シナリオのクリーンアップ](#72-孤立シナリオのクリーンアップ)
+   - 7.3 [ターゲット機器の安全な削除フロー](#73-ターゲット機器の安全な削除フロー)
+   - 7.4 [システムバックアップ & リストア](#74-システムバックアップ--リストア-system-backup--restore)
 8. [トラブルシューティング & FAQ](#8-トラブルシューティング--faq)
 9. [ユーザー体験 (UX/DX) 向上のためのベストプラクティス](#9-ユーザー体験-uxdx-向上のためのベストプラクティス)
 
@@ -63,7 +71,8 @@ graph LR
 
 ### 2.1 前提条件
 * **Docker & Docker Compose** (推奨環境: Docker 24.0+, Docker Compose v2.20+)
-* または **Go 1.22+** (ローカルバイナリとしてビルド・実行する場合)
+* または **Go 1.22+** (Docker なしでローカル起動・開発する場合)
+* ※ Docker が使用できない隔離環境でも、Musubi は組み込み SQLite により単体で完全自律稼働します。
 
 ---
 
@@ -94,20 +103,72 @@ curl -s http://localhost:8080/v1/system/healths | jq .
 
 ---
 
-### 2.3 ローカルバイナリでのビルド & 起動
+### 2.3 Docker 不要！SQLite モードでのスタンドアロン起動 & 設定管理
 
-コンテナを使わず、開発端末やオンプレミスサーバーのホストOS上で直接起動する場合の手順です。
+Docker や外部 RDBMS のないエアギャップ環境や軽量テスト環境では、SQLite を使用して単一プロセスで稼働させることができます。
 
+#### 1. ビルド & 設定ファイルの準備
 ```bash
-# 1. 全バイナリの一括コンパイル (bin/ に生成されます)
+# 全バイナリの一括コンパイル (bin/ に musubi-server, musubi-cli, mock-snmp-agent が生成されます)
 make build
 
-# 2. Musubi サーバーの起動 (デフォルト: SQLite インメモリ / ローカルDB)
+# 設定ファイルのひな型をコピー
+cp config.example.yaml config.yaml
+```
+
+#### 2. `config.yaml` の主要設定項目
+```yaml
+server:
+  port: 8080             # HTTP REST / SSE API ポート
+  snmp_trap_port: 162    # SNMP Trap / Inform 受信ポート (管理者権限不要な場合は 1162 等に変更可)
+
+database:
+  driver: "sqlite3"      # "sqlite3" または "postgres"
+  dsn: "file:./data/musubi.db?cache=shared&_fk=1"
+
+backup:
+  enabled: true          # インプロセス定期自動バックアップ
+  interval: "1h"         # バックアップ間隔 (1h, 24h 等)
+  dir: "./backups"       # アーカイブ出力先ディレクトリ
+  max_keep: 7            # 保持世代数 (超過分は自動ローテーション削除)
+
+retention:
+  enabled: true          # ログリテンション定期パージ
+  interval: "24h"
+  days: 30
+```
+
+#### 3. サーバーと Mock Agent の起動
+```bash
+# Musubi サーバーの起動 (設定ファイルまたはデフォルト値で自動起動)
 ./bin/musubi-server
 
-# 別ターミナルで Mock SNMP Agent を起動 (必要に応じて)
+# 別ターミナルで検証用 Mock SNMP Agent を起動
 ./bin/mock-snmp-agent
 ```
+
+> [!TIP]
+> **環境変数による上書き設定**:
+> 設定ファイルを作らずとも、環境変数で即座に設定を注入できます：
+> ```bash
+> DATABASE_DRIVER=sqlite3 DATABASE_DSN="file:./data/musubi.db?cache=shared&_fk=1" PORT=8080 ./bin/musubi-server
+> ```
+> PostgreSQL へ切り替える場合は以下のように指定します：
+> ```bash
+> DATABASE_DRIVER=postgres DATABASE_DSN="postgres://musubi:musubi_secret@localhost:5432/musubi?sslmode=disable" ./bin/musubi-server
+> ```
+
+---
+
+### 2.4 Docker 不要 E2E 自動検証スクリプトの実行
+
+Docker を一切使わずに、Musubi Server、Mock SNMP Agent、CLI をローカルで一時起動し、ターゲット登録・Ping 疎通・シナリオ実行・障害注入・バックアップ取得・データ破壊後のリストア復旧までをワンコマンドで自動検証できます：
+
+```bash
+make sqlite-e2e
+```
+
+全ステップが正常終了すると `All SQLite E2E tests passed successfully!` と表示されます。
 
 ---
 
@@ -664,18 +725,76 @@ curl -X DELETE "http://localhost:8080/v1/targets/spine1?force=true&force_abort=t
 
 ---
 
-### 7.4 システムバックアップ & リストア
+### 7.4 システムバックアップ & リストア (System Backup & Restore)
 
-全ターゲット、認証プロファイル、シナリオ、バージョン履歴を JSON 形式で瞬時にバックアップ・リストア可能です。
+Musubi は、エアギャップ環境やミッションクリティカルな検証ラボでの確実な障害復旧（DR）と環境複製のため、**SHA-256 チェックサム付き `.tar.gz` アーカイブによる全エンティティの一括バックアップとトランザクション復元** を提供しています。
 
+#### 1. バックアップアーカイブの仕様と構成
+バックアップアーカイブ（`.tar.gz`）は、以下の 3 ファイルで構成されます：
+* `manifest.json`: バックアップメタデータ（作成日時、スキーマバージョン、各エンティティのレコード件数）。
+* `data.json`: 全 9 テーブル（Users, CredentialProfiles, Targets, Scenarios, ScenarioVersions, Jobs, JobSteps, StateTransitionLogs, AuditLogs）の完全な JSON シリアライズデータ（機密 SNMP パスフレーズを含む）。
+* `checksum.sha256`: `data.json` の SHA-256 ハッシュ値。リストア時に改ざんや破損がないか事前検証されます。
+
+#### 2. CLI によるバックアップとリストア
+
+##### バックアップの作成
 ```bash
-# バックアップの作成
-curl -s -X POST http://localhost:8080/v1/system/backups > musubi_backup_$(date +%Y%m%d).json
+# デフォルト名（musubi-backup-<TIMESTAMP>.tar.gz）で出力
+./bin/musubi-cli backup create
 
-# バックアップからのリストア
+# 出力先パスを指定して作成
+./bin/musubi-cli backup create --output /var/backups/musubi-full-20260914.tar.gz
+```
+
+##### バックアップからのリストア
+```bash
+# 指定アーカイブから安全に復元
+./bin/musubi-cli backup restore --archive /var/backups/musubi-full-20260914.tar.gz
+```
+> [!IMPORTANT]
+> リストア処理は **単一のデータベーストランザクション内** で実行されます。アーカイブの SHA-256 検証が成功した後に既存データをクリーンアップして復元するため、途中でエラーが発生した場合は自動的にロールバックされ、データ破壊が防止されます。
+
+#### 3. REST API によるバックアップとダウンロード
+
+##### バックアップの作成 (`POST /v1/system/backups`)
+```bash
+curl -s -X POST http://localhost:8080/v1/system/backups | jq .
+```
+**レスポンス例 (`200 OK`):**
+```json
+{
+  "filename": "musubi-backup-20260914-120000.tar.gz",
+  "file_size": 28410,
+  "checksum_sha256": "3a7b8c...",
+  "download_url": "/v1/system/downloads/musubi-backup-20260914-120000.tar.gz",
+  "created_at": "2026-09-14T12:00:00Z"
+}
+```
+
+##### バックアップのダウンロード (`GET /v1/system/downloads/:filename`)
+```bash
+# パストラバーサル防止セキュリティ機能付きの安全なダウンロード
+curl -O http://localhost:8080/v1/system/downloads/musubi-backup-20260914-120000.tar.gz
+```
+
+##### バックアップからのリストア (`POST /v1/system/restores`)
+```bash
 curl -s -X POST http://localhost:8080/v1/system/restores \
   -H "Content-Type: application/json" \
-  -d @musubi_backup_20260822.json
+  -d '{
+    "archive_path": "./backups/musubi-backup-20260914-120000.tar.gz"
+  }' | jq .
+```
+
+#### 4. インプロセス定期自動バックアップ & 世代数ローテーション
+`config.yaml` で定期バックアップを有効化すると、OS の cron 等に依存せず Musubi プロセス内部の自律ワーカーが定期的にアーカイブを生成し、古い世代を自動クリーンアップします。
+
+```yaml
+backup:
+  enabled: true          # 定期バックアップの有効化
+  interval: "1h"         # バックアップ実行間隔 (例: 1h, 12h, 24h)
+  dir: "./backups"       # アーカイブ保存先ディレクトリ
+  max_keep: 7            # 保持する最大世代数 (超過分は古い順に自動削除)
 ```
 
 ---

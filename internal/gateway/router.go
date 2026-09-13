@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -54,6 +56,7 @@ type Server struct {
 	Hub                  *notification.Hub
 	Runner               *orchestrator.Runner
 	SSEKeepAliveInterval time.Duration
+	BackupDir            string
 }
 
 // TargetProviderAdapter adapts EntClient to orchestrator.TargetProvider
@@ -117,14 +120,21 @@ func NewServer(client *ent.Client, hub *notification.Hub, stateRepo *state.Repos
 	adapter := &TargetProviderAdapter{Client: client}
 	runner := orchestrator.NewRunner(lifecycleMgr, stateRepo, evaluator, hub, adapter)
 
+	backupDir := os.Getenv("BACKUP_DIR")
+	if backupDir == "" {
+		backupDir = "./data/backups"
+	}
+
 	s := &Server{
-		Engine:       engine,
-		EntClient:    client,
-		LifecycleMgr: lifecycleMgr,
-		StateRepo:    stateRepo,
-		Evaluator:    evaluator,
-		Hub:          hub,
-		Runner:       runner,
+		Engine:               engine,
+		EntClient:            client,
+		LifecycleMgr:         lifecycleMgr,
+		StateRepo:            stateRepo,
+		Evaluator:            evaluator,
+		Hub:                  hub,
+		Runner:               runner,
+		SSEKeepAliveInterval: 15 * time.Second,
+		BackupDir:            backupDir,
 	}
 
 	s.setupRoutes()
@@ -192,6 +202,7 @@ func (s *Server) setupRoutes() {
 		v1.GET("/audit/logs", s.handleListAuditLogs)
 		v1.GET("/audit/exports", s.handleExportAuditEvidence)
 		v1.POST("/system/backups", s.handleCreateBackup)
+		v1.GET("/system/downloads/:filename", s.handleDownloadBackup)
 		v1.POST("/system/restores", s.handleRestoreBackup)
 		v1.POST("/system/purge", s.handlePurgeSystemLogs)
 		v1.GET("/system/healthz", s.handleHealthz)
@@ -1058,16 +1069,101 @@ func (s *Server) handleExportAuditEvidence(c *gin.Context) {
 }
 
 func (s *Server) handleCreateBackup(c *gin.Context) {
+	backupDir := s.BackupDir
+	if backupDir == "" {
+		backupDir = "./data/backups"
+	}
+	res, err := database.CreateBackupArchive(c.Request.Context(), s.EntClient, backupDir)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"type":   "https://musubi.dev/errors/backup-failed",
+			"title":  "Backup Failed",
+			"status": http.StatusInternalServerError,
+			"detail": err.Error(),
+			"code":   "BACKUP_FAILED",
+		})
+		return
+	}
 	c.JSON(http.StatusOK, gin.H{
-		"filename":     "musubi-backup.tar.gz",
-		"download_url": "/v1/system/downloads/backup.tar.gz",
+		"filename":     res.Filename,
+		"download_url": res.DownloadURL,
 	})
 }
 
+func (s *Server) handleDownloadBackup(c *gin.Context) {
+	filename := c.Param("filename")
+	base := filepath.Base(filename)
+	if base == "." || base == "/" || base == "" || strings.Contains(filename, "..") {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid filename"})
+		return
+	}
+	backupDir := s.BackupDir
+	if backupDir == "" {
+		backupDir = "./data/backups"
+	}
+	targetPath := filepath.Join(backupDir, base)
+	if _, err := os.Stat(targetPath); err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "backup file not found"})
+		return
+	}
+	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", base))
+	c.Header("Content-Type", "application/gzip")
+	c.File(targetPath)
+}
+
 func (s *Server) handleRestoreBackup(c *gin.Context) {
+	type RestorePayload struct {
+		ArchivePath string `json:"archive_path"`
+	}
+	var payload RestorePayload
+	if err := c.ShouldBindJSON(&payload); err != nil || payload.ArchivePath == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"type":   "https://musubi.dev/errors/invalid-request",
+			"title":  "Invalid Request",
+			"status": http.StatusBadRequest,
+			"detail": "archive_path is required",
+			"code":   "INVALID_REQUEST",
+		})
+		return
+	}
+
+	targetPath := payload.ArchivePath
+	if _, err := os.Stat(targetPath); err != nil {
+		// Try resolving within backupDir
+		backupDir := s.BackupDir
+		if backupDir == "" {
+			backupDir = "./data/backups"
+		}
+		candidate := filepath.Join(backupDir, filepath.Base(payload.ArchivePath))
+		if _, cErr := os.Stat(candidate); cErr == nil {
+			targetPath = candidate
+		} else {
+			c.JSON(http.StatusNotFound, gin.H{
+				"type":   "https://musubi.dev/errors/archive-not-found",
+				"title":  "Archive Not Found",
+				"status": http.StatusNotFound,
+				"detail": fmt.Sprintf("archive not found at '%s'", payload.ArchivePath),
+				"code":   "ARCHIVE_NOT_FOUND",
+			})
+			return
+		}
+	}
+
+	res, err := database.RestoreBackupArchive(c.Request.Context(), s.EntClient, targetPath)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"type":   "https://musubi.dev/errors/restore-failed",
+			"title":  "Restore Failed",
+			"status": http.StatusInternalServerError,
+			"detail": err.Error(),
+			"code":   "RESTORE_FAILED",
+		})
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{
-		"restored":     true,
-		"tables_count": 10,
+		"restored":     res.Restored,
+		"tables_count": res.TablesCount,
 	})
 }
 

@@ -68,6 +68,9 @@ func NewClient(ctx context.Context, driver, dsn string) (*ent.Client, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to open sqlite database: %w", err)
 		}
+		if _, pErr := db.ExecContext(ctx, "PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;"); pErr != nil {
+			slog.Warn("Failed to execute SQLite PRAGMA initialization", "error", pErr)
+		}
 	default:
 		return nil, fmt.Errorf("unsupported database driver: %s", driver)
 	}

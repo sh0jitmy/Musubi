@@ -140,11 +140,12 @@ API エラーはすべて **RFC 7807 (Problem Details for HTTP APIs)** に準拠
   1. `ent/schema/*.go` を編集。
   2. `go generate ./ent` を実行して ORM コードを再生成。
   3. `database.NewClient` を通じた自動マイグレーション (`client.Schema.Create`) の動作をテスト。
-- **SQLite テストと PostgreSQL 本番の互換性**:
-  - 単体テストではインメモリ SQLite (`file:test?mode=memory&cache=shared&_pragma=foreign_keys(1)`)、E2E/本番環境では PostgreSQL を使用します。
+- **SQLite スタンドアロンと PostgreSQL の柔軟切り替え**:
+  - `internal/common/config` により、`config.yaml` または環境変数 (`DATABASE_DRIVER`, `DATABASE_DSN`) で SQLite (`sqlite3`) と PostgreSQL (`postgres`) を透過的に切り替え可能。
+  - SQLite 接続時には `internal/database/db.go` により自動的に `PRAGMA foreign_keys = ON;` および `PRAGMA busy_timeout = 5000;` が適用され、WAL モード競合やロック競合を防止します。
   - RDBMS 依存の生 SQL を書かず、Ent の型安全クエリビルダを使用してください。
 
-### 4.3 ログリテンション & In-Process Cleaner Worker の設計
+### 4.6 ログリテンション & In-Process Cleaner Worker の設計
 - **マルチプラットフォーム自律動作**:
   - Linux `crontab` や OS 固有のスケジューラに依存せず、Go プロセス内の `time.Ticker` による非同期 Goroutine (`internal/database/cleaner.go:StartBackgroundCleaner`) で動作します。
   - Windows, macOS, Linux, コンテナ環境のいずれでも単一バイナリで自律的にログパージが機能します。
@@ -155,6 +156,18 @@ API エラーはすべて **RFC 7807 (Problem Details for HTTP APIs)** に準拠
 - **手動パージと API**:
   - CLI: `musubi-cli maintenance purge --days <N>`
   - API: `POST /v1/system/purge` (`{"days": 30}`)
+
+### 4.7 バックアップ ＆ トランザクションリストア エンジンの設計
+- **アーカイブ仕様 (`internal/database/backup.go`)**:
+  - `.tar.gz` 形式。内部に `manifest.json`, `data.json`, `checksum.sha256` を格納。
+  - 全 9 エンティティ（Users, CredentialProfiles, Targets, Scenarios, ScenarioVersions, Jobs, JobSteps, StateTransitionLogs, AuditLogs）を完全に網羅。
+  - Ent の `Sensitive()` フィールド（`AuthPassphrase`, `PrivPassphrase`）は JSON シリアライズで除外されるため、明示的な `BackupCredentialProfile` 構造体を用いて機密情報を安全にエクスポート・インポート。
+- **高信頼トランザクションリストア**:
+  - 事前検証: Gzip 解凍および SHA-256 チェックサムの照合を行い、破損・改ざんされたアーカイブのリストアをブロック。
+  - 単一トランザクション内リストア: 既存全データのクリーンアップと全エンティティの復元を同一 DB トランザクション内で実行し、エラー時は即座に自動ロールバック。
+- **インプロセス定期バックアップワーカー**:
+  - `StartBackgroundBackup(ctx, client, dir, interval, maxKeep)` により、バックグラウンド Goroutine で自律動作。
+  - 指定世代数（デフォルト 7 世代）を超過した古いアーカイブは自動ローテーション削除。
 
 ---
 
@@ -175,7 +188,16 @@ make test
 bash scripts/check_coverage.sh
 ```
 
-### 5.2 Docker Compose & E2E / Grafana 検証
+### 5.2 Docker 不要 E2E 自動検証スクリプト (純 Go スタック)
+```bash
+# Docker なしで一時 SQLite + Mock Agent + Musubi Server + CLI を起動し、
+# ターゲット作成・Ping・シナリオ実行・ドレイン・バックアップ・リストア・CLI 疎通を自動検証
+make sqlite-e2e
+# または
+bash scripts/sqlite_e2e.sh
+```
+
+### 5.3 Docker Compose & E2E / Grafana 検証
 ```bash
 # PostgreSQL, VictoriaMetrics, Grafana, Mock Agent を含むフルスタック起動
 docker compose -f deploy/docker-compose.yml up -d --build
@@ -187,7 +209,7 @@ curl http://localhost:8080/v1/system/healthz
 open http://localhost:3000   # (admin / admin)
 ```
 
-### 5.3 SNMP シナリオ E2E パケットキャプチャ (PCAP) 検証
+### 5.4 SNMP シナリオ E2E パケットキャプチャ (PCAP) 検証
 ```bash
 # Bulk-Get -> SET -> Inform-Request -> ACK の E2E 実行と PCAP 生成
 make pcap-verify
@@ -205,11 +227,12 @@ tcpdump -r test_reports/snmp_scenario_flow.pcap -nn -X
 ```
 Musubi/
 ├── api/
-│   └── openapi.yaml                 # OpenAPI 3.0 API 定義仕様書
+│   └── openapi.yaml                 # OpenAPI 3.1 API 定義仕様書
 ├── cmd/
-│   ├── musubi-server/               # Musubi メインサーバー起動エントリポイント (In-Process Cleaner, Trap Listener 統合)
+│   ├── musubi-server/               # Musubi メインサーバー起動エントリポイント (定期バックアップ/パージ統合)
 │   ├── musubi-cli/                  # 管理用 CLI ツール (maintenance purge, backup, targets, scenarios)
 │   └── mock-snmp-agent/             # SNMP 擬似エージェント (GET, SET, Bulk-Get, Inform-Request 送信対応)
+├── config.example.yaml              # SQLite / PostgreSQL 設定テンプレート
 ├── deploy/
 │   ├── docker-compose.yml           # E2E・デモ用 Docker Compose 定義 (ログローテーション, TSDBリテンション設定済)
 │   ├── prometheus/                  # Prometheus 収集設定 (scrape_configs)
@@ -226,8 +249,9 @@ Musubi/
 ├── internal/
 │   ├── collector/                   # SNMP クライアント (BulkGet対応) & UDP Trap/Inform リスナー (RFC 3416 ACK対応)
 │   ├── common/                      # 共通モジュール (バッチャ, リースロック, ハブ, メトリクス, エラー)
-│   ├── database/                    # Ent クライアント初期化 & In-Process Cleaner Worker
-│   ├── gateway/                     # REST API ルーター, ハンドラ, RFC 7807 変換, /v1/system/purge
+│   │   └── config/                  # 設定ローダー (config.yaml & 環境変数パース)
+│   ├── database/                    # DB 初期化, バックアップ/リストア, In-Process Cleaner Worker
+│   ├── gateway/                     # REST API ルーター, ハンドラ, RFC 7807 変換, /v1/system/backups
 │   ├── orchestrator/                # シナリオ DSL 実行エンジン (Bulk-Get, SET, wait.until), PCAP Capture テスト
 │   ├── state/                       # 2-Tier 状態リポジトリ & Google CEL 評価器
 │   └── testutil/snmpmock/           # テスト用 SNMP モックエージェント (Bulk-Get, SET, Inform-Request)
@@ -235,6 +259,7 @@ Musubi/
 │   ├── check_coverage.sh            # カバレッジ自動検証スクリプト (>= 80%)
 │   ├── demo.sh                      # フルスタックライブデモスクリプト
 │   ├── docker_e2e.sh                # Docker E2E テストスイート
+│   ├── sqlite_e2e.sh                # Docker 不要 SQLite E2E テストスイート
 │   ├── test_grafana_ui.py           # Grafana UI 自動検証スクリプト
 │   └── verify_snmp_pcap_flow.py     # SNMP シナリオ PCAP パケット検証スクリプト
 └── test_reports/

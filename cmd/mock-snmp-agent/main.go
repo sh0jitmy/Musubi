@@ -17,6 +17,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -24,6 +25,7 @@ import (
 	"syscall"
 
 	"github.com/gosnmp/gosnmp"
+	"github.com/sh0jitmy/musubi/internal/testutil/pcap"
 	"github.com/sh0jitmy/musubi/internal/testutil/snmpmock"
 )
 
@@ -53,9 +55,26 @@ func main() {
 	})
 	agent.SetTrapTarget(trapTarget)
 
-	addr, err := agent.Start()
+	// Optional PCAP packet capture hook
+	pcapPath := os.Getenv("PCAP_CAPTURE_PATH")
+	if pcapPath != "" {
+		recorder, err := pcap.NewPcapRecorder(pcapPath)
+		if err != nil {
+			log.Fatalf("Failed to initialize PCAP recorder: %v", err)
+		}
+		defer recorder.Close()
+		agent.SetPacketHook(recorder.RecordUDPPacket)
+		//nolint:gosec // log injection not applicable for local pcap path
+		log.Printf("PCAP packet capture enabled: %s", pcapPath)
+	}
+
+	bindAddr := fmt.Sprintf("127.0.0.1:%d", port)
+	if port == 0 {
+		bindAddr = "127.0.0.1:0"
+	}
+	addr, err := agent.StartAt(bindAddr)
 	if err != nil {
-		log.Fatalf("Failed to start mock agent: %v", err)
+		log.Fatalf("Failed to start mock agent on %s: %v", bindAddr, err)
 	}
 
 	//nolint:gosec // log injection not applicable for local port

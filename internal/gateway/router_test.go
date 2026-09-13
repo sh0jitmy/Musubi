@@ -66,6 +66,7 @@ func setupTestServer(t *testing.T, dbName string) *gateway.Server {
 
 	server, err := gateway.NewServer(client, hub, stateRepo)
 	require.NoError(t, err)
+	server.BackupDir = t.TempDir()
 	return server
 }
 
@@ -427,8 +428,24 @@ steps:
 	server.Engine.ServeHTTP(w, req)
 	assert.Equal(t, http.StatusOK, w.Code)
 
+	var bResp map[string]any
+	err := json.Unmarshal(w.Body.Bytes(), &bResp)
+	require.NoError(t, err)
+	bFilename, ok := bResp["filename"].(string)
+	require.True(t, ok)
+	assert.NotEmpty(t, bFilename)
+
+	// Download backup
 	w = httptest.NewRecorder()
-	req, _ = http.NewRequest(http.MethodPost, "/v1/system/restores", nil)
+	req, _ = http.NewRequest(http.MethodGet, "/v1/system/downloads/"+bFilename, nil)
+	server.Engine.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	// Restore backup
+	restorePayload, _ := json.Marshal(map[string]string{"archive_path": bFilename})
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest(http.MethodPost, "/v1/system/restores", bytes.NewReader(restorePayload))
+	req.Header.Set("Content-Type", "application/json")
 	server.Engine.ServeHTTP(w, req)
 	assert.Equal(t, http.StatusOK, w.Code)
 
@@ -1535,4 +1552,35 @@ func TestGateway_NewServer_EvaluatorError(t *testing.T) {
 	require.Error(t, err)
 	assert.Nil(t, server)
 	assert.Contains(t, err.Error(), "mocked cel env error for new server")
+}
+
+func TestGateway_BackupRestoreEndpoints(t *testing.T) {
+	t.Parallel()
+	server := setupTestServer(t, "gw_backup_restore")
+
+	// 1. Missing archive_path in restore -> 400
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest(http.MethodPost, "/v1/system/restores", bytes.NewReader([]byte(`{}`)))
+	req.Header.Set("Content-Type", "application/json")
+	server.Engine.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+
+	// 2. Non-existent archive -> 404
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest(http.MethodPost, "/v1/system/restores", bytes.NewReader([]byte(`{"archive_path": "nonexistent-backup.tar.gz"}`)))
+	req.Header.Set("Content-Type", "application/json")
+	server.Engine.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusNotFound, w.Code)
+
+	// 3. Download path traversal -> 400
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest(http.MethodGet, "/v1/system/downloads/..%2Fsecret.txt", nil)
+	server.Engine.ServeHTTP(w, req)
+	assert.True(t, w.Code == http.StatusBadRequest || w.Code == http.StatusNotFound)
+
+	// 4. Download non-existent file -> 404
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest(http.MethodGet, "/v1/system/downloads/missing-archive.tar.gz", nil)
+	server.Engine.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusNotFound, w.Code)
 }

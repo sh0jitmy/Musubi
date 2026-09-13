@@ -1,0 +1,34 @@
+# Musubi Configuration Example
+# Copy this file to config.yaml to customize runtime behavior.
+
+server:
+  # HTTP Gateway listening port
+  port: "8080"
+  # SNMP Trap / Inform UDP listener port (use unprivileged port e.g. 10162 if running without root)
+  trap_port: "162"
+
+database:
+  # Supported drivers: "sqlite3" (default, zero external dependencies), "postgres"
+  driver: "sqlite3"
+  # SQLite DSN with WAL mode, foreign keys, and busy timeout for concurrent safety
+  dsn: "musubi.db?_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)"
+
+  # For PostgreSQL, uncomment below:
+  # driver: "postgres"
+  # dsn: "postgres://musubi:musubi_secret@localhost:5432/musubi?sslmode=disable"
+
+backup:
+  # Enable in-process scheduled backups
+  enabled: true
+  # Backup generation interval in hours
+  interval_hours: 24
+  # Number of historical backup archives to retain before automatic rotation
+  retention_count: 7
+  # Directory where backup archives (.tar.gz) are stored
+  directory: "./data/backups"
+
+retention:
+  # In-process log retention cleaner execution interval in hours
+  interval_hours: 24
+  # Age threshold in days for purging old state transition logs, jobs, and audit logs
+  days: 30

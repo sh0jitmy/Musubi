@@ -1,6 +1,6 @@
 # Makefile for Go Development & Custom Skills Management
 
-.PHONY: help check install self-eval generate test fmt lint tidy vulncheck build release-check release-snapshot license-check license-add migration-diff clean openapi-lint publish-pr ai-pr demo docker-e2e grafana-e2e
+.PHONY: help check install self-eval generate test fmt lint tidy vulncheck build release-check release-snapshot license-check license-add migration-diff clean openapi-lint publish-pr ai-pr demo docker-e2e sqlite-e2e grafana-e2e
 
 help:
 	@echo "Available commands:"
@@ -14,6 +14,7 @@ help:
 	@echo "    test             Run Go tests with race detector and coverage"
 	@echo "    demo             Run full-stack live demo with Docker Compose"
 	@echo "    docker-e2e       Run end-to-end test suite against Docker Compose stack"
+	@echo "    sqlite-e2e       Run Standalone SQLite (No-Docker) end-to-end test suite"
 	@echo "    grafana-e2e      Run Grafana UI test, value assertions & HTML report generation"
 	@echo "    pcap-verify      Run SNMP Bulk-Get, SET & Inform flow with PCAP capture"
 	@echo "    build            Build binary to bin/app"
@@ -78,6 +79,10 @@ demo:
 docker-e2e:
 	@echo "==> Running Docker E2E test suite..."
 	@bash scripts/docker_e2e.sh
+
+sqlite-e2e:
+	@echo "==> Running Standalone SQLite (No-Docker) E2E test suite..."
+	@bash scripts/sqlite_e2e.sh
 
 grafana-e2e:
 	@echo "==> Running Grafana UI E2E test & HTML report generation..."
