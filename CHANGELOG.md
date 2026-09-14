@@ -1,5 +1,10 @@
 # Changelog
 
+## [v0.0.7](https://github.com/sh0jitmy/Musubi/compare/v0.0.6...v0.0.7) - 2026-09-14
+
+- chore(deps): bump github.com/jackc/pgx/v5 from 5.10.0 to 5.11.0 by @dependabot[bot] in https://github.com/sh0jitmy/Musubi/pull/32
+- chore(deps): bump golang.org/x/crypto from 0.56.0 to 0.57.0 by @dependabot[bot] in https://github.com/sh0jitmy/Musubi/pull/31
+
 ## [v0.0.6](https://github.com/sh0jitmy/Musubi/compare/v0.0.5...v0.0.6) - 2026-09-13
 
 - feat: add application configuration and database backup/restore function by @sh0jitmy in https://github.com/sh0jitmy/Musubi/pull/29
