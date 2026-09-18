@@ -1,10 +1,11 @@
 # Makefile for Go Development & Custom Skills Management
 
-.PHONY: help check install self-eval generate test fmt lint tidy vulncheck build release-check release-snapshot license-check license-add migration-diff clean openapi-lint publish-pr ai-pr demo docker-e2e sqlite-e2e grafana-e2e
+.PHONY: help check install self-eval generate test fmt lint tidy vulncheck build release-check release-snapshot license-check license-add migration-diff clean openapi-lint publish-pr ai-pr demo docker-e2e sqlite-e2e grafana-e2e frontend-e2e ssg-build run
 
 help:
 	@echo "Available commands:"
 	@echo "  Go Development:"
+	@echo "    run              Run full standalone stack locally on Mac/Linux/WSL (no Docker needed)"
 	@echo "    openapi-lint     Validate OpenAPI spec with Spectral"
 	@echo "    generate         Generate OpenAPI and ent entity code"
 	@echo "    fmt              Format Go source files"
@@ -15,9 +16,11 @@ help:
 	@echo "    demo             Run full-stack live demo with Docker Compose"
 	@echo "    docker-e2e       Run end-to-end test suite against Docker Compose stack"
 	@echo "    sqlite-e2e       Run Standalone SQLite (No-Docker) end-to-end test suite"
+	@echo "    frontend-e2e     Run Standalone Frontend HTMX UI E2E test & snapshot generation"
+	@echo "    ssg-build        Export pre-rendered static site HTML & assets (SSG mode)"
 	@echo "    grafana-e2e      Run Grafana UI test, value assertions & HTML report generation"
 	@echo "    pcap-verify      Run SNMP Bulk-Get, SET & Inform flow with PCAP capture"
-	@echo "    build            Build binary to bin/app"
+	@echo "    build            Build binaries to bin/ (musubi-server, musubi-cli, mock-snmp-agent, musubi-web)"
 	@echo "    release-check    Validate GoReleaser configuration"
 	@echo "    release-snapshot Run GoReleaser snapshot build"
 	@echo "    license-check    Verify license & author headers in Go files"
@@ -84,6 +87,14 @@ sqlite-e2e:
 	@echo "==> Running Standalone SQLite (No-Docker) E2E test suite..."
 	@bash scripts/sqlite_e2e.sh
 
+frontend-e2e:
+	@echo "==> Running Standalone Frontend HTMX UI E2E test & snapshot generation..."
+	@bash scripts/frontend_e2e.sh
+
+ssg-build:
+	@echo "==> Exporting pre-rendered static site (SSG)..."
+	@go run ./cmd/musubi-web --ssg-export dist
+
 grafana-e2e:
 	@echo "==> Running Grafana UI E2E test & HTML report generation..."
 	@python3 scripts/test_grafana_ui.py
@@ -96,12 +107,16 @@ benchmark:
 	@echo "==> Running Musubi scale & load benchmark suite..."
 	@go run scripts/benchmark_scale_load.go
 
+run: build
+	@bash scripts/run_local.sh
+
 build: generate
 	@echo "==> Building binaries..."
 	@mkdir -p bin
 	@go build -v -o bin/musubi-server ./cmd/musubi-server
 	@go build -v -o bin/musubi-cli ./cmd/musubi-cli
 	@go build -v -o bin/mock-snmp-agent ./cmd/mock-snmp-agent
+	@go build -v -o bin/musubi-web ./cmd/musubi-web
 
 release-check:
 	@echo "==> Validating GoReleaser configuration..."

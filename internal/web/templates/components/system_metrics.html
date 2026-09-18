@@ -1,0 +1,67 @@
+{{define "system_metrics"}}
+<div class="metrics-grid">
+    <!-- CPU Usage -->
+    <div class="metric-card">
+        <div class="metric-header">
+            <span class="metric-title">Process CPU Usage</span>
+            <span class="metric-icon">⚙️</span>
+        </div>
+        <div class="metric-value-row">
+            <span class="metric-value">{{printf "%.1f" .CPUPercent}}</span>
+            <span class="metric-unit">%</span>
+        </div>
+        <div class="progress-bar">
+            <div class="progress-fill" style="width: {{if gt .CPUPercent 100.0}}100{{else}}{{printf "%.1f" .CPUPercent}}{{end}}%;"></div>
+        </div>
+        <div class="metric-subtext">
+            <span>Goroutine Scheduler Load</span>
+        </div>
+    </div>
+
+    <!-- Memory Alloc -->
+    <div class="metric-card">
+        <div class="metric-header">
+            <span class="metric-title">Memory Allocation (Heap / Sys)</span>
+            <span class="metric-icon">💾</span>
+        </div>
+        <div class="metric-value-row">
+            <span class="metric-value">{{printf "%.1f" .MemHeapMB}}</span>
+            <span class="metric-unit">MB Heap</span>
+        </div>
+        <div class="metric-subtext">
+            <span>Sys: {{printf "%.1f" .MemSysMB}} MB | RSS: {{printf "%.1f" .MemRSSMB}} MB</span>
+        </div>
+    </div>
+
+    <!-- Goroutines Count -->
+    <div class="metric-card">
+        <div class="metric-header">
+            <span class="metric-title">Active Goroutines</span>
+            <span class="metric-icon">🧵</span>
+        </div>
+        <div class="metric-value-row">
+            <span class="metric-value" style="color: var(--accent-primary);">{{.Goroutines}}</span>
+            <span class="metric-unit">threads</span>
+        </div>
+        <div class="metric-subtext">
+            <span class="badge badge-success">LEAK-FREE</span>
+            <span>collector, state & gateway</span>
+        </div>
+    </div>
+
+    <!-- Network Bandwidth / SNMP Traffic -->
+    <div class="metric-card">
+        <div class="metric-header">
+            <span class="metric-title">SNMP & API Bandwidth</span>
+            <span class="metric-icon">📡</span>
+        </div>
+        <div class="metric-value-row">
+            <span class="metric-value">{{printf "%.2f" .BandwidthKBps}}</span>
+            <span class="metric-unit">KB/s</span>
+        </div>
+        <div class="metric-subtext">
+            <span>Traps / Informs / Bulk-Get traffic</span>
+        </div>
+    </div>
+</div>
+{{end}}

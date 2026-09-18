@@ -1,0 +1,136 @@
+{{define "dashboard_content"}}
+<div class="dashboard-header">
+    <div class="dashboard-title">
+        <h2>🖥️ 統合監視ダッシュボード</h2>
+        <p>プロセス負荷・メモリ・SNMP通信帯域・ターゲットヘルス・実行履歴のリアルタイム可視化</p>
+    </div>
+    <div class="header-controls">
+        <button class="btn btn-secondary btn-sm"
+                hx-get="/ui/components/system-metrics"
+                hx-target="#system-metrics-container"
+                hx-swap="innerHTML">
+            🔄 メトリクス即時更新
+        </button>
+        <a href="/scenarios" class="btn btn-primary btn-sm">
+            ⚡ シナリオ新規実行
+        </a>
+    </div>
+</div>
+
+<!-- 1. System Resources & Bandwidth (Row 1) -->
+<section class="panel-section">
+    <div class="panel-header">
+        <div class="panel-title">
+            <span>⚙️ システムリソース & SNMP帯域 (Process CPU / Memory / Throughput / Goroutines)</span>
+            <span class="badge badge-info">Prometheus Scraped</span>
+        </div>
+        <div class="panel-actions">
+            <span style="font-size: 11px; color: var(--text-muted);">Auto-refresh: 5s</span>
+        </div>
+    </div>
+    <div id="system-metrics-container"
+         hx-get="/ui/components/system-metrics"
+         hx-trigger="every 5s"
+         hx-swap="innerHTML">
+        {{template "system_metrics" .Metrics}}
+    </div>
+</section>
+
+<!-- 2. Target Telemetry & MIB Data (Row 2) -->
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+    <!-- Target Inventory -->
+    <section class="panel-section">
+        <div class="panel-header">
+            <div class="panel-title">
+                <span>🎯 ターゲットインベントリ & 死活ステータス</span>
+            </div>
+            <div class="panel-actions">
+                <button class="btn btn-secondary btn-sm"
+                        hx-get="/ui/components/targets-table"
+                        hx-target="#targets-table-container"
+                        hx-swap="innerHTML">
+                    更新
+                </button>
+            </div>
+        </div>
+        <div id="targets-table-container"
+             hx-get="/ui/components/targets-table"
+             hx-trigger="every 5s"
+             hx-swap="innerHTML">
+            {{template "targets_table" .TargetsData}}
+        </div>
+    </section>
+
+    <!-- Latest MIB Cache -->
+    <section class="panel-section">
+        <div class="panel-header">
+            <div class="panel-title">
+                <span>📡 最新MIBテレメトリ (Trap / Inform / BulkGet)</span>
+            </div>
+            <div class="panel-actions">
+                <button class="btn btn-secondary btn-sm"
+                        hx-get="/ui/components/mibs-table"
+                        hx-target="#mibs-table-container"
+                        hx-swap="innerHTML">
+                    更新
+                </button>
+            </div>
+        </div>
+        <div id="mibs-table-container"
+             hx-get="/ui/components/mibs-table"
+             hx-trigger="every 5s"
+             hx-swap="innerHTML">
+            {{template "mibs_table" .MibsData}}
+        </div>
+    </section>
+</div>
+
+<!-- 3. Scenario Job Executions & Audit Trail (Row 3) -->
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+    <!-- Scenario Jobs -->
+    <section class="panel-section">
+        <div class="panel-header">
+            <div class="panel-title">
+                <span>⚡ シナリオジョブ実行履歴 & 実行判定</span>
+            </div>
+            <div class="panel-actions">
+                <button class="btn btn-secondary btn-sm"
+                        hx-get="/ui/components/jobs-table"
+                        hx-target="#jobs-table-container"
+                        hx-swap="innerHTML">
+                    更新
+                </button>
+            </div>
+        </div>
+        <div id="jobs-table-container"
+             hx-get="/ui/components/jobs-table"
+             hx-trigger="every 5s"
+             hx-swap="innerHTML">
+            {{template "jobs_table" .JobsData}}
+        </div>
+    </section>
+
+    <!-- Audit Logs -->
+    <section class="panel-section">
+        <div class="panel-header">
+            <div class="panel-title">
+                <span>🛡️ API & 管理者操作監査ログ (Audit Trail)</span>
+            </div>
+            <div class="panel-actions">
+                <button class="btn btn-secondary btn-sm"
+                        hx-get="/ui/components/audit-logs"
+                        hx-target="#audit-table-container"
+                        hx-swap="innerHTML">
+                    更新
+                </button>
+            </div>
+        </div>
+        <div id="audit-table-container"
+             hx-get="/ui/components/audit-logs"
+             hx-trigger="every 5s"
+             hx-swap="innerHTML">
+            {{template "audit_table" .AuditData}}
+        </div>
+    </section>
+</div>
+{{end}}

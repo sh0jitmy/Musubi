@@ -42,3 +42,8 @@ coverage.html
 # Node dependencies
 node_modules/
 package*.json
+
+# Local database & data files
+data/
+*.db
+*.db-*

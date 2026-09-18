@@ -1,0 +1,36 @@
+{{define "audit_table"}}
+<div class="table-wrapper">
+    <table>
+        <thead>
+            <tr>
+                <th>Timestamp</th>
+                <th>User</th>
+                <th>Role</th>
+                <th>Action</th>
+                <th>Target / Resource</th>
+                <th>Client IP</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{if .AuditLogs}}
+                {{range .AuditLogs}}
+                <tr>
+                    <td style="color: var(--text-secondary); font-size: 12px;">{{.CreatedAtFormatted}}</td>
+                    <td><strong>{{.UserID}}</strong></td>
+                    <td><span class="badge badge-info">{{.Role}}</span></td>
+                    <td><code>{{.Action}}</code></td>
+                    <td><code>{{.TargetID}}</code></td>
+                    <td><code>{{.IP}}</code></td>
+                </tr>
+                {{end}}
+            {{else}}
+                <tr>
+                    <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 24px;">
+                        記録された監査ログはありません。
+                    </td>
+                </tr>
+            {{end}}
+        </tbody>
+    </table>
+</div>
+{{end}}

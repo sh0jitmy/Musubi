@@ -39,6 +39,7 @@ Goの設計・実装ベストプラクティス（`golang-design`, `golang-imple
 
 | 対象ファイル | 改善内容と効果 | 関連スキル & ルール | 判定 | レビュアーの判定理由・妥当性コメント |
 | :--- | :--- | :--- | :--- | :--- |
+| `cmd/musubi-web/main.go`<br>`internal/web/` | ・Docker不要の独立Goフロントエンドサーバの実装。<br>・`embed.FS` によるHTMLテンプレート・CSS・HTMXライブラリの自己完結埋め込み。<br>・SSG（静的サイト生成: `make ssg-build`）機能の統合。<br>・レイヤードアーキテクチャに準拠したBFF（Backend-for-Frontend）設計。 | [golang-design:1]<br>[golang-design:2]<br>[golang-implementation:1] | **PASS** | バックエンドコア（`musubi-server`）と関心事が明確に分離され、`cmd/musubi-web` および `internal/web` にGo標準レイアウトで綺麗にカプセル化されているため適合します。 |
 | `cmd/app/main.go` | ・エントリーポイント（`main.go`）のみを配置。<br>・ビジネスロジックやハンドラー記述を完全に排除し、`cli.App` による引数パース、DIの初期化、起動処理のみを担当。 | [golang-design:1] | **PASS** | `main.go` の肥大化が解消され、ビジネスロジックやハンドラー記述が `internal/` 配下へ綺麗にカプセル化されているため、Go のディレクトリ Layout Conventions に適合します。 |
 | `internal/api/` | ・OpenAPI からの自動生成コード（`ogen/api.gen.go`）を独立パッケージ `ogen` に分離し、ハンドラーの実装 (`handler.go`)、および Gin エンジンの構成 (`server.go`) は `internal/api` に配置。 | [golang-design:1]<br>[golang-design:2] | **PASS** | Web API 関連の関心事が綺麗に切り出されており、生成コードと手書きコードが分離されているため適合と判定します。 |
 
@@ -49,6 +50,7 @@ Goの設計・実装ベストプラクティス（`golang-design`, `golang-imple
 
 | 対象ファイル | 改善内容と効果 | 関連スキル & ルール | 判定 | レビュアーの判定理由・妥当性コメント |
 | :--- | :--- | :--- | :--- | :--- |
+| `cmd/musubi-web/main.go`<br>`scripts/frontend_e2e.sh` | ・Docker不要の独立Webフロントエンド起動およびグレースフルシャットダウン（`signal.NotifyContext`）。<br>・`make frontend-e2e` による自動検証プロセスの整備。 | [sre-deployment:1]<br>[golang-design:1] | **PASS** | コンテナランタイムのない環境でも即座にWeb UIを起動でき、SREのデプロイ容易性・運用継続性に大きく寄与するため適合します。 |
 | `cmd/app/main.go` | ・Let's Encrypt（`autocert`）を用いた HTTPS 自動更新および証明書キャッシュ管理機能を統合。<br>・HTTP (80) から HTTPS (443) への自動リダイレクトを実装。 | [golang-design:6] | **PASS** | 本番運用における常時 HTTPS 化のベストプラクティスが標準で組み込まれており、信頼性とセキュリティが向上しているため適合と判定します。 |
 | `.github/workflows/` | ・`ci.yml` により、静的解析、パッケージ脆弱性診断 (`govulncheck`)、単体・E2Eテスト、および自動生成コードの差分チェックがPR時に自動実行。 | [sre-deployment:1]<br>[sre-deployment:2] | **PASS** | コード生成漏れを防ぐ `git diff --exit-code` 監査を含む強力な CI パイプラインが定義されており、リリースの安全性が極めて高いため適合します。 |
 | `cmd/app/main.go`<br>`internal/api/middleware.go`<br>`internal/api/server.go` | ・OpenTelemetry Metrics APIによるメトリクス（リクエスト数・遅延）の計装。<br>・OTel Prometheus Exporter による `/metrics` の公開（低カーディナリティの遵守）。 | [golang-observability:2]<br>[software-architecture:6.1] | **PASS** | OTel標準に準拠したメトリクス収集がミドルウェアで計装され、低カーディナリティ（/users/:id等）で `/metrics` からエクスポート可能なため、SLO/SLAの観測要件に適合します。 |
@@ -70,6 +72,7 @@ Goの設計・実装ベストプラクティス（`golang-design`, `golang-imple
 
 | 対象ファイル | 改善内容と効果 | 関連スキル & ルール | 判定 | レビュアーの判定理由・妥当性コメント |
 | :--- | :--- | :--- | :--- | :--- |
+| `internal/web/server_test.go`<br>`scripts/test_frontend_ui.py` | ・`internal/web` のテストカバレッジ 87.5% 達成（ビジネスロジック全体で 94.86% 達成）。<br>・ヘッドレスChromeによるE2E UI検証および解像度1920x1280スナップショット自動生成。<br>・全アサーションPASSのHTMLテストレポート（Base64埋め込み画像付き）の出力。 | [golang-e2e-testing:1]<br>[golang-e2e-testing:2]<br>[golang-e2e-testing:3] | **PASS** | タイミング依存のない状態ポーリングアサーション、並行テスト（`t.Parallel()`）、goroutineリーク検証（`goleak`）、およびGrafana同等のスナップショット取得が完備されており適合します。 |
 | `cmd/app/main_test.go` | ・インメモリ SQLite データベースをテストケースごとに毎回新規準備し、順序依存や環境依存のない結合E2Eテストを実行。<br>・`TestMain` 内で `goleak.VerifyTestMain` による goroutine メモリリーク自動検出を導入。 | [golang-e2e-testing:1]<br>[golang-e2e-testing:2]<br>[golang-e2e-testing:3] | **PASS** | タイミング依存（`time.Sleep`）のない安全な結合テストが実装されており、かつテスト品質リンター（`paralleltest` 等）もすべてクリアしているため適合と判定します。 |
 
 ---
@@ -79,6 +82,7 @@ Goの設計・実装ベストプラクティス（`golang-design`, `golang-imple
 
 | 対象ファイル | 改善内容と効果 | 関連スキル & ルール | 判定 | レビュアーの判定理由・妥当性コメント |
 | :--- | :--- | :--- | :--- | :--- |
+| `internal/web/static/js/` | ・HTMXライブラリ（`htmx.min.js`）およびCSSのローカルvendoring化。<br>・外部CDNへの一切の通信を排除した完全エアギャップ・オフライン対応。 | [software-architecture:4]<br>[golang-design:1] | **PASS** | サードパーティCDN依存によるサプライチェーン攻撃や情報漏洩リスクを完全に排除しており、閉域網のセキュリティ要件に適合します。 |
 | `internal/api/handler.go` | ・ログ出力時にパスワードやシークレットを自動マスキングする `SecureJSONHandler` (`slog`) の実装。 | [golang-implementation:3] | **PASS** | ログファイルへのパスワードの平文書き出しがプログラムレベルで確実に防止（`[REDACTED]` にマスク）されているため、セキュリティ要件を満たしており適合します。 |
 | `internal/api/middleware.go` | ・`Strict-Transport-Security` (HSTS) ヘッダー付与ミドルウェアの実装。<br>・`Authorization: Bearer` トークンによるリクエスト認証ミドルウェアの実装。 | [golang-design:6] | **PASS** | アプリケーションの各 API リクエストにおいて HTTPS 通信およびトークン認証が強制されているため、通信セキュリティ要件を満たしており適合します。 |
 | `cmd/app/main.go` | ・安全な pprof の有効化。<br>・pprof ポート（`127.0.0.1:6060`）を localhost にのみ制限して起動。 | [golang-observability:4] | **PASS** | プロファイリングポートが外部に露出しないよう localhost のみにバインドされており、情報漏洩やDoSのセキュリティリスクを防いでいるため適合します。 |

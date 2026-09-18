@@ -180,6 +180,7 @@ func (s *Server) setupRoutes() {
 		v1.POST("/scenarios/:id/runs", s.handleRunScenario)
 
 		// Jobs
+		v1.GET("/jobs", s.handleListJobs)
 		v1.GET("/jobs/:id", s.handleGetJob)
 		v1.POST("/jobs/:id/cancels", s.handleCancelJob)
 
@@ -936,6 +937,18 @@ func (s *Server) handleAdhocScenario(c *gin.Context) {
 		"status":         types.JobStatusRunning,
 		"locked_targets": lockedTargets,
 		"stream_url":     streamURL,
+	})
+}
+
+func (s *Server) handleListJobs(c *gin.Context) {
+	jobs, err := s.EntClient.Job.Query().Order(ent.Desc(job.FieldCreatedAt)).All(c.Request.Context())
+	if err != nil {
+		_ = c.Error(errors.NewInternalError(err.Error()))
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"items": jobs,
+		"total": len(jobs),
 	})
 }
 
