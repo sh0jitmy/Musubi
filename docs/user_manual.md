@@ -14,6 +14,7 @@
    - 2.2 [Docker Compose による即時起動 (推奨)](#22-docker-compose-による即時起動-推奨)
    - 2.3 [Docker 不要！SQLite モードでのスタンドアロン起動 & 設定管理](#23-docker-不要sqlite-モードでのスタンドアロン起動--設定管理)
    - 2.4 [Docker 不要 E2E 自動検証スクリプトの実行](#24-docker-不要-e2e-自動検証スクリプトの実行)
+   - 2.5 [ワンコマンドでのローカルスタンドアロン起動 (make run)](#25-ワンコマンドでのローカルスタンドアロン起動-make-run)
 3. [認証プロファイルとターゲット機器の管理](#3-認証プロファイルとターゲット機器の管理)
 4. [シナリオ作成パーフェクトガイド (DSL & CEL 仕様)](#4-シナリオ作成パーフェクトガイド-dsl--cel-仕様)
 5. [シナリオの登録・実行・進捗監視・オンデマンド実行](#5-シナリオの登録実行進捗監視オンデマンド実行)
@@ -22,7 +23,11 @@
    - 5.3 [ジョブの進捗確認・ログ取得・強制キャンセル](#53-ジョブの進捗確認ログ取得強制キャンセル)
    - 5.4 [SSE によるリアルタイムストリーム購読](#54-sse-server-sent-events-によるリアルタイムストリーム購読)
    - 5.5 [オンデマンド・ワンショット シナリオ直接実行 (Ad-hoc Execution)](#55-オンデマンドワンショット-シナリオ直接実行-ad-hoc-execution)
-6. [Grafana ダッシュボードによるリアルタイム監視](#6-grafana-ダッシュボードによるリアルタイム監視)
+6. [監視ダッシュボード & 可視化 (Grafana & HTMX スタンドアロン Web UI)](#6-監視ダッシュボード--可視化-grafana--htmx-スタンドアロン-web-ui)
+   - 6.1 [Grafana 対話型フィルター](#61-ダッシュボード上部の対話型フィルター-ユーザー指定)
+   - 6.2 [Grafana 大量レコードのページネーション](#62-大量レコード-2000-件-のスムーズな表示とページネーション)
+   - 6.3 [Grafana 提供パネル一覧](#63-提供パネル一覧)
+   - 6.4 [Docker 不要！HTMX スタンドアロン Web フロントエンド (musubi-web)](#64-docker-不要htmx-スタンドアロン-web-フロントエンド-musubi-web)
 7. [運用・保守・ライフサイクル管理](#7-運用保守ライフサイクル管理)
    - 7.1 [定期ログパージ & 保持期間管理](#71-定期ログパージ--保持期間管理)
    - 7.2 [孤立シナリオのクリーンアップ](#72-孤立シナリオのクリーンアップ)
@@ -109,7 +114,7 @@ Docker や外部 RDBMS のないエアギャップ環境や軽量テスト環境
 
 #### 1. ビルド & 設定ファイルの準備
 ```bash
-# 全バイナリの一括コンパイル (bin/ に musubi-server, musubi-cli, mock-snmp-agent が生成されます)
+# 全バイナリの一括コンパイル (bin/ に musubi-server, musubi-cli, mock-snmp-agent, musubi-web が生成されます)
 make build
 
 # 設定ファイルのひな型をコピー
@@ -169,6 +174,18 @@ make sqlite-e2e
 ```
 
 全ステップが正常終了すると `All SQLite E2E tests passed successfully!` と表示されます。
+
+---
+
+### 2.5 ワンコマンドでのローカルスタンドアロン起動 (make run)
+
+Docker を使わずに、Mock SNMP Agent、Musubi サーバー（SQLite）、および HTMX Web フロントエンドを一括起動してブラウザから即座に動作確認したい場合は、以下のワンコマンドを実行します：
+
+```bash
+make run
+```
+
+起動後、自動で `bin/` へのビルドが行われ、ポート競合の自動回避（8080 が他プロセスで使用中の場合は自動で 18080 を使用）および初期ターゲット `spine1` の投入が完了し、`http://localhost:3001` で Web ダッシュボードが利用可能になります。終了時は `Ctrl + C` を押すことで全プロセスが安全に停止します。
 
 ---
 
@@ -621,7 +638,7 @@ curl -X POST http://localhost:8080/v1/scenarios/adhoc \
 
 ---
 
-## 6. Grafana ダッシュボードによるリアルタイム監視と対話型検索・絞り込み
+## 6. 監視ダッシュボード & 可視化 (Grafana & HTMX スタンドアロン Web UI)
 
 Musubi は VictoriaMetrics (TSDB) および PostgreSQL と連携した公式 Grafana ダッシュボード (`deploy/grafana/dashboards/musubi_overview.json`) を標準提供しています。
 
@@ -652,6 +669,52 @@ Grafana ダッシュボード上部には、リアルタイムに対象ログを
 4. **ターゲット台帳 & ステータス (Panel 6)**: 機器ステータス、ポート、認証プロファイル、最終ハートビート。
 5. **シナリオ ジョブ実行履歴 (Panel 8)**: ジョブ成否、実行日時、トリガー元の推移。
 6. **管理 & API 監査ログ (Panel 9)**: ユーザー操作、クライアント IP、実行アクションの証跡。
+
+### 6.4 Docker 不要！HTMX スタンドアロン Web フロントエンド (musubi-web)
+
+Docker や Grafana、VictoriaMetrics を利用できない閉域網・オンプレミス環境や、開発者がローカルで軽量に検証したい場合に向けて、Musubi は Go 標準 HTTP サーバー (`embed.FS`) と HTMX を組み合わせたスタンドアロン Web フロントエンド (`cmd/musubi-web`) を標準装備しています。
+
+* **アクセス URL**: `http://localhost:3001` (デフォルト)
+* **設計仕様・意思決定**: [ADR-0003: Standalone HTMX Frontend Architecture](adr/0003-standalone-htmx-frontend-architecture.md)
+
+#### 1. 統合監視ダッシュボード (`/`)
+Grafana のダッシュボードで提供されている監視項目（CPU・メモリ・Goroutine・SNMPパケットレート・ターゲット機器一覧・MIBキャッシュ・シナリオジョブ実行履歴・監査ログ）を、HTML テンプレートと HTMX ポーリング（`hx-trigger="every 3s"`）により外部通信ゼロでリアルタイム表示します。
+
+![Musubi Web Dashboard](images/frontend_dashboard.png)
+
+* **システムメトリクス**: `/metrics` (Prometheus エクスポーター) から取得したリアルタイム CPU・Go ランタイムメモリ（Heap/Sys）・Goroutine 数・SNMP リクエスト/Trap 処理レート。
+* **ターゲット機器一覧**: 現在登録されている機器のステータス、IP アドレス、ポート、認証プロファイル、最新ヘルスチェック状態。
+* **リアルタイム MIB キャッシュ**: 最新の IF-MIB / IP-MIB などの値と前回収集値、更新元（TRAP/INFORM/POLL）。
+* **ジョブ実行履歴 & 監査ログ**: 直近のシナリオ実行ステータス（SUCCESS / FAILED）と REST API 操作証跡。
+
+#### 2. シナリオ対話作成・即時実行スタジオ (`/scenarios`)
+YAML 構文の直接入力、プリセットテンプレート（リンク障害・復旧検証、バルク状態確認等）の読み込み、ワンクリック構文プリフライト検証、およびワンショット直接実行 (`POST /v1/scenarios/adhoc`) が行えます。
+
+![Musubi Scenario Studio](images/frontend_scenarios.png)
+
+* **対話型 YAML エディタ**: プリセットボタンをクリックするだけで実用的なシナリオ YAML が自動挿入されます。
+* **構文バリデーション**: 「Validate Syntax」ボタンで、サーバーへ送信する前に YAML 構文と必須フィールドを検証。
+* **即時ワンショット実行**: 「Run Ad-hoc Scenario」をクリックすると、`musubi-server` の `/v1/scenarios/adhoc` API を直接キックし、即座にターゲット機器の排他ロックを獲得して試験を開始します。
+* **HTMX リアルタイム進捗追尾**: 実行中のジョブ状態を 2 秒ごとに自動ポーリングし、ステップの進行状況と実行ログをブラウザ上にリアルタイム反映します。
+
+#### 3. 起動コマンド & 静的サイト生成 (SSG)
+
+```bash
+# 1. ワンコマンドでスタック全体（Mock Agent + Core Server + Web UI）を一括起動
+make run
+# -> ブラウザで http://localhost:3001 を開く
+
+# 2. Web サーバー単体起動 (デフォルト: ポート 3001、APIエンドポイント http://localhost:8080)
+./bin/musubi-web --port 3001 --api-endpoint http://localhost:8080
+
+# 3. 静的サイト生成 (SSG) による完全オフライン HTML エクスポート
+./bin/musubi-web --ssg-export ./dist
+# -> dist/index.html, dist/scenarios.html, dist/static/ が生成されます
+
+# 4. ヘッドレス Chrome による自動 E2E UI 検証 & スナップショット生成
+make frontend-e2e
+# -> docs/images/frontend_dashboard.png, docs/images/frontend_scenarios.png, test_reports/frontend_e2e_report.html を出力
+```
 
 ---
 
@@ -825,6 +888,15 @@ A. はい。Musubi は Non-blocking 内部 Batcher と効率的な UDP Trap リ�
 
 **Q. シナリオの途中でエラーが発生した場合、設定変更は元に戻りますか？**  
 A. はい。シナリオに `teardown` ブロックを記述しておくことで、途中のステップが失敗またはタイムアウトした場合でも必ずロールバック処理が実行されます。
+
+**Q. Docker や Grafana が使えない閉域環境でもブラウザで監視やシナリオ実行ができますか？**  
+A. はい。純 Go 製の `musubi-web` が同梱されており、`make run` または `./bin/musubi-web` を実行するだけで、Docker 不要・外部 CDN 通信ゼロでリアルタイム監視ダッシュボードとシナリオ作成・実行スタジオ（`http://localhost:3001`）を利用できます。
+
+**Q. ポート 8080 が別のコンテナやプロセスで使用中の場合はどうなりますか？**  
+A. `make run`（`scripts/run_local.sh`）はポート競合の自動回避機能を備えており、8080 が既に使用されている場合は自動でポート 18080 へ切り替えて `musubi-server` を起動し、`musubi-web` も追従して 18080 へ接続します。
+
+**Q. macOS や Windows でも musubi-web や make run は動作しますか？**  
+A. はい。Go のクロスコンパイル機能と標準ライブラリ（`embed.FS`）により、macOS（Darwin arm64/amd64）および Windows（amd64）のどちらでも単一バイナリとして完全ネイティブ動作します。Windows 環境では `go build -o bin/musubi-web.exe ./cmd/musubi-web` により `.exe` として実行可能です。
 
 ---
 

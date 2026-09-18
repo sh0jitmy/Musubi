@@ -1,0 +1,50 @@
+{{define "jobs_table"}}
+<div class="table-wrapper">
+    <table>
+        <thead>
+            <tr>
+                <th>Job ID</th>
+                <th>Scenario Name</th>
+                <th>Version</th>
+                <th>Execution Verdict</th>
+                <th>Triggered By</th>
+                <th>Started At</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{if .Jobs}}
+                {{range .Jobs}}
+                <tr>
+                    <td><code>{{.ID}}</code></td>
+                    <td><strong>{{.ScenarioID}}</strong></td>
+                    <td>v{{.ScenarioVersion}}</td>
+                    <td>
+                        {{if eq .Status "SUCCESS"}}
+                            <span class="badge badge-success">✅ SUCCESS</span>
+                        {{else if eq .Status "FAILED"}}
+                            <span class="badge badge-danger">❌ FAILED</span>
+                        {{else if eq .Status "RUNNING"}}
+                            <span class="badge badge-warning">⚡ RUNNING</span>
+                        {{else if eq .Status "QUEUED"}}
+                            <span class="badge badge-info">⏳ QUEUED</span>
+                        {{else if eq .Status "ABORTED"}}
+                            <span class="badge badge-danger">🛑 ABORTED</span>
+                        {{else}}
+                            <span class="badge badge-info">{{.Status}}</span>
+                        {{end}}
+                    </td>
+                    <td><code>{{.TriggeredBy}}</code></td>
+                    <td style="color: var(--text-secondary); font-size: 12px;">{{.CreatedAtFormatted}}</td>
+                </tr>
+                {{end}}
+            {{else}}
+                <tr>
+                    <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 24px;">
+                        実行されたシナリオジョブの履歴はありません。
+                    </td>
+                </tr>
+            {{end}}
+        </tbody>
+    </table>
+</div>
+{{end}}

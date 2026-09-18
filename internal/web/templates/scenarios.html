@@ -1,0 +1,101 @@
+{{define "scenarios_content"}}
+<div class="dashboard-header">
+    <div class="dashboard-title">
+        <h2>⚡ シナリオスタジオ (Scenario Builder & Execution Studio)</h2>
+        <p>SNMPオーケストレーションDSLシナリオの作成・テンプレート挿入・即時実行・実行結果のリアルタイム追跡</p>
+    </div>
+</div>
+
+<div class="studio-grid">
+    <!-- Left Column: Scenario Registration Form -->
+    <div class="panel-section">
+        <div class="panel-header">
+            <div class="panel-title">
+                <span>📝 シナリオ新規作成 / 登録フォーム</span>
+            </div>
+            <div class="panel-actions">
+                <span class="badge badge-purple">YAML DSL v1</span>
+            </div>
+        </div>
+
+        <div id="scenario-form-feedback"></div>
+
+        <form hx-post="/ui/scenarios"
+              hx-target="#scenario-form-feedback"
+              hx-swap="innerHTML">
+            <!-- Preset Template Selector -->
+            <div class="form-group">
+                <label class="form-label">クイックテンプレート選択 (Quick Presets):</label>
+                <select class="form-select" onchange="window.applyScenarioTemplate(this.value)">
+                    <option value="">-- テンプレートを選択してDSL自動入力 --</option>
+                    <option value="snmp-get-descr">🔍 SNMP GET (System Descr取得)</option>
+                    <option value="snmp-admin-toggle">🔄 SNMP SET (IF Admin Down -> 検証 -> 自動復旧Teardown)</option>
+                    <option value="snmp-bulk-walk">📋 SNMP BULK-GET (Interfaces MIB一括取得)</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="scenario-name-input">シナリオ名 (Scenario Name):</label>
+                <input type="text" id="scenario-name-input" name="name" class="form-input" placeholder="例: spine1-port-shutdown-test" required>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="scenario-desc-input">説明 (Description):</label>
+                <input type="text" id="scenario-desc-input" name="description" class="form-input" placeholder="例: ポートAdmin Downおよび復旧の整合性確認">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="scenario-dsl-input">オーケストレーション YAML DSL (Steps & Teardown):</label>
+                <textarea id="scenario-dsl-input" name="dsl_yaml" class="form-textarea" rows="12" placeholder="name: scenario-name&#10;target_locks: [spine1]&#10;steps:&#10;  - id: s1&#10;    target: spine1&#10;    action: action.snmp_get&#10;    params:&#10;      oid: &quot;.1.3.6.1.2.1.1.1.0&quot;&#10;teardown: []" required></textarea>
+            </div>
+
+            <button type="submit" class="btn btn-primary" style="width: 100%;">
+                💾 シナリオを登録する (Register Scenario)
+            </button>
+        </form>
+    </div>
+
+    <!-- Right Column: Registered Scenarios & Live Execution Output -->
+    <div style="display: flex; flex-direction: column; gap: 24px;">
+        <!-- Registered Scenarios Table -->
+        <div class="panel-section">
+            <div class="panel-header">
+                <div class="panel-title">
+                    <span>📚 登録済みシナリオ一覧</span>
+                </div>
+                <div class="panel-actions">
+                    <button class="btn btn-secondary btn-sm"
+                            hx-get="/ui/components/scenarios-list"
+                            hx-target="#scenarios-list-container"
+                            hx-swap="innerHTML">
+                        🔄 更新
+                    </button>
+                </div>
+            </div>
+            <div id="scenarios-list-container"
+                 hx-get="/ui/components/scenarios-list"
+                 hx-trigger="load, every 5s"
+                 hx-swap="innerHTML">
+                {{template "scenarios_list" .ScenariosData}}
+            </div>
+        </div>
+
+        <!-- Live Execution Output Console -->
+        <div class="panel-section">
+            <div class="panel-header">
+                <div class="panel-title">
+                    <span>⚡ リアルタイムジョブ実行モニター (Live Execution Stream)</span>
+                </div>
+                <div class="panel-actions">
+                    <span class="badge badge-info">Auto-Polling</span>
+                </div>
+            </div>
+            <div id="active-job-output">
+                <div style="color: var(--text-muted); font-size: 13px; text-align: center; padding: 20px;">
+                    シナリオの「⚡ 実行」ボタンを押すと、ここに実行結果とステータスがリアルタイム表示されます。
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{{end}}

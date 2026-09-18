@@ -1,0 +1,46 @@
+{{define "mibs_table"}}
+<div class="table-wrapper">
+    <table>
+        <thead>
+            <tr>
+                <th>Target</th>
+                <th>MIB / OID</th>
+                <th>Current Value</th>
+                <th>Previous Value</th>
+                <th>Acquisition Source</th>
+                <th>Last Updated</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{if .Transitions}}
+                {{range .Transitions}}
+                <tr>
+                    <td><strong>{{.Target}}</strong></td>
+                    <td><code>{{.StateKey}}</code></td>
+                    <td><strong style="color: var(--accent-primary);">{{.NewValue}}</strong></td>
+                    <td style="color: var(--text-muted);">{{if .OldValue}}{{.OldValue}}{{else}}<em>(none)</em>{{end}}</td>
+                    <td>
+                        {{if eq .Trigger "TRAP"}}
+                            <span class="badge badge-warning">TRAP</span>
+                        {{else if eq .Trigger "INFORM"}}
+                            <span class="badge badge-purple">INFORM</span>
+                        {{else if eq .Trigger "BULKGET"}}
+                            <span class="badge badge-info">BULK-GET</span>
+                        {{else}}
+                            <span class="badge badge-secondary">{{.Trigger}}</span>
+                        {{end}}
+                    </td>
+                    <td style="color: var(--text-secondary); font-size: 12px;">{{.CreatedAtFormatted}}</td>
+                </tr>
+                {{end}}
+            {{else}}
+                <tr>
+                    <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 24px;">
+                        受信したMIBテレメトリおよび状態遷移ログはありません。
+                    </td>
+                </tr>
+            {{end}}
+        </tbody>
+    </table>
+</div>
+{{end}}

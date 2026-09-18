@@ -1,0 +1,50 @@
+{{define "scenarios_list"}}
+<div class="table-wrapper">
+    <table>
+        <thead>
+            <tr>
+                <th>Scenario Name</th>
+                <th>Description</th>
+                <th>Target Locks</th>
+                <th>Version</th>
+                <th>Created At</th>
+                <th style="text-align: right;">Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{if .Scenarios}}
+                {{range .Scenarios}}
+                <tr>
+                    <td><strong>{{.Name}}</strong></td>
+                    <td style="color: var(--text-secondary);">{{if .Description}}{{.Description}}{{else}}<em>-</em>{{end}}</td>
+                    <td>
+                        {{range .TargetLocks}}
+                            <code>{{.}}</code>
+                        {{else}}
+                            <span style="color: var(--text-muted); font-size: 11px;">none</span>
+                        {{end}}
+                    </td>
+                    <td><span class="badge badge-info">v{{.Version}}</span></td>
+                    <td style="color: var(--text-secondary); font-size: 12px;">{{.CreatedAtFormatted}}</td>
+                    <td style="text-align: right;">
+                        <button class="btn btn-primary btn-sm"
+                                hx-post="/ui/scenarios/{{.Name}}/run"
+                                hx-target="#active-job-output"
+                                hx-swap="afterbegin"
+                                title="Run this scenario immediately">
+                            ⚡ 実行
+                        </button>
+                    </td>
+                </tr>
+                {{end}}
+            {{else}}
+                <tr>
+                    <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 24px;">
+                        登録されているシナリオはありません。左のフォームから作成してください。
+                    </td>
+                </tr>
+            {{end}}
+        </tbody>
+    </table>
+</div>
+{{end}}

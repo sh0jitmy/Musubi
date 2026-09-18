@@ -20,6 +20,7 @@
 * 📐 **CEL (Common Expression Language) による宣言的評価**: `raw['spine1']['IF-MIB::ifOperStatus.1'] == 'up'` のような直感的で高速・型安全な条件判定。
 * 🛡️ **Lease Lock によるターゲット保護**: 複数エンジニアや並行テストによるターゲット機器の競合や誤設定変更を自動でブロック。
 * 📊 **統合オブザーバビリティ (VictoriaMetrics & Grafana)**: CPU・メモリ・帯域・SNMP テレメトリ・MIB テーブル・Trap ログをリアルタイム可視化する公式ダッシュボードを同梱。
+* 💻 **Docker 不要！HTMX スタンドアロン Web フロントエンド (musubi-web)**: Grafana や Docker なしで稼働する軽量 Web UI。リアルタイム監視、対話型 YAML シナリオ作成・即時実行スタジオ、SSG 静的書き出しを完全エアギャップで提供。
 * 🧩 **OpenAPI 3.1 & REST / SSE API 完備**: 全機能を標準化された RESTful API および SSE (Server-Sent Events) ストリームで外部公開。CLI (`musubi-cli`) も標準提供。
 
 ---
@@ -34,6 +35,7 @@ graph TB
         CLI["Musubi CLI (musubi-cli)"]
         WebUI["Web Browser / REST Client"]
         Grafana["Grafana Dashboard (:3000)"]
+        MusubiWeb["Standalone Web UI (musubi-web :3001)"]
     end
 
     subgraph MusubiServer["Musubi Core Engine (musubi-server :8080)"]
@@ -62,6 +64,7 @@ graph TB
     WebUI --> Gateway
     Grafana --> TSDB
     Grafana --> Gateway
+    MusubiWeb --> Gateway
 
     Gateway --> Orchestrator
     Gateway --> StateStore
@@ -91,6 +94,7 @@ Musubi/
 │   └── openapi.yaml               # OpenAPI 3.1 API 完全定義仕様書
 ├── cmd/
 │   ├── musubi-server/             # Musubi メインサーバーバイナリ
+│   ├── musubi-web/                # Docker不要！スタンドアロン HTMX Web フロントエンド
 │   ├── musubi-cli/                # 運用・自動化用 CLI ツール
 │   └── mock-snmp-agent/           # テスト・検証用 Pure-Go Mock SNMP エージェント
 ├── deploy/
@@ -111,6 +115,7 @@ Musubi/
 │   ├── gateway/                   # REST API ルーター & ミドルウェア
 │   ├── orchestrator/              # シナリオパーサー, プリフライト検証, ジョブランナー
 │   ├── state/                     # CEL 評価エンジン & 状態リポジトリ
+│   ├── web/                       # HTMX フロントエンド、テンプレート、BFFクライアント、SSGエンジン
 │   └── testutil/                  # テスト用ユーティリティ & Mock SNMP Agent
 ├── scripts/
 │   ├── demo.sh                    # フルスタック動作確認用ワンコマンドデモ
@@ -179,7 +184,28 @@ make sqlite-e2e
 
 ---
 
-### 4. ワンコマンド デモスクリプトの実行 (Docker 環境)
+### 4. Docker 不要！HTMX Web フロントエンドの起動 & 画面検証
+
+Grafana や Docker を起動できない閉域・軽量環境でも、純 Go 製の `musubi-web` によりブラウザベースの監視ダッシュボードとシナリオ作成スタジオが利用可能です：
+
+```bash
+# ワンコマンドで一括起動 (Mock Agent + Core Server + Web UI)
+make run
+# -> ブラウザで http://localhost:3001 を開く
+
+# または Web サーバーのみ単体起動 (ポート 3001)
+./bin/musubi-web --port 3001 --api-endpoint http://localhost:8080
+
+# 静的サイト生成 (SSG) による完全オフライン HTML エクスポート
+./bin/musubi-web --ssg-export ./dist
+
+# ヘッドレス Chrome による E2E UI 自動検証 & スナップショット生成
+make frontend-e2e
+```
+
+---
+
+### 5. ワンコマンド デモスクリプトの実行 (Docker 環境)
 
 スタックの起動から、認証プロファイル作成、ターゲット登録、シナリオ登録、ジョブ実行までを完全自動で体験できます：
 
@@ -350,6 +376,30 @@ Musubi には、VictoriaMetrics (TSDB) および PostgreSQL と連携した公�
 
 ---
 
+## 💻 Docker 不要！スタンドアロン HTMX Web フロントエンド (musubi-web)
+
+Musubi は、Docker や Grafana、VictoriaMetrics が利用できない閉域環境や開発用ローカル環境向けに、**純 Go + HTMX による軽量・高機能なスタンドアロン Web フロントエンド (`cmd/musubi-web`)** を標準提供しています。
+
+* **アクセス URL**: `http://localhost:3001`
+* **設計仕様・意思決定**: [ADR-0003: Standalone HTMX Frontend Architecture](docs/adr/0003-standalone-htmx-frontend-architecture.md)
+
+### 1. 統合モニタリングダッシュボード (Grafana 代替)
+Grafana で可視化されている全メトリクス（CPU/メモリ/Goroutineリソース、SNMPトラフィックレート、ターゲット機器一覧、リアルタイム MIB キャッシュ、シナリオ実行履歴、API 監査ログ）を、HTMX (`hx-trigger="every 3s"`) によるミリ秒級の自動ポーリング更新でブラウザに表示します。
+
+![Musubi Web Dashboard](docs/images/frontend_dashboard.png)
+
+### 2. シナリオ対話作成・即時実行スタジオ (Scenario Studio)
+YAML シナリオの対話型エディタ、プリセット読み込み、ワンクリック構文プリフライト検証、およびターゲット排他ロックと連動したワンショット直接実行 (`POST /v1/scenarios/adhoc`) を備えています。実行後は HTMX がジョブの進捗と実行ログをリアルタイムに自動追尾します。
+
+![Musubi Scenario Studio](docs/images/frontend_scenarios.png)
+
+### 3. 主な特長
+- 🔒 **完全エアギャップ対応**: HTMX 1.9.12 および CSS/JS は Go バイナリ内に `embed.FS` でバンドルされており、インターネット接続や外部 CDN 依存は一切ありません。
+- 📦 **SSG (Static Site Generation) サポート**: `./bin/musubi-web --ssg-export ./dist` を実行することで、監査証跡や静的確認用のスタンドアロン HTML/CSS/JS を一括書き出し可能。
+- 🧪 **自動 E2E UI 検証 & スナップショット**: `make frontend-e2e` コマンドにより、ヘッドレス Chrome による全画面の自動テスト・解像度 1920x1280 のスナップショット生成・HTML レポート出力 (`test_reports/frontend_e2e_report.html`) が完結します。
+
+---
+
 ## ⚡ 大規模MIB反映 & 高多重負荷ベンチマーク実測結果 (Benchmark Results)
 
 Musubi の高性能・低遅延特性を検証するため、**Apple M2 (8 Cores: 4P+4E) / 16.0 GB RAM / macOS arm64** 環境にて実機負荷ベンチマークを実施しました。詳細は [負荷・性能ベンチマーク試験記録](docs/load_test_report.md) をご参照ください。
@@ -403,12 +453,15 @@ make benchmark
 
 | コマンド | 説明 |
 | :--- | :--- |
+| `make run` | Mock Agent + Core Server (SQLite) + HTMX Web UI を一括起動（Docker 不要・ポート衝突自動回避） |
 | `make fmt` | ソースコードのフォーマット (`go fmt` / リンター自動修正) |
 | `make lint` | `golangci-lint` による全パッケージの厳格な静的解析 |
 | `make test` | データ競合検知 (`-race`) および 80% 基準カバレッジ測定付きテスト実行 |
 | `make pcap-verify` | SNMP Bulk-Get / SET / Inform フローの自動実行と PCAP パケット構造解析 |
 | `make benchmark` | 大規模 MIB 反映 (2048 OID) & 12 Agent 並列負荷ベンチマーク実行とレポート生成 |
-| `make build` | `bin/` 配下への全実行可能バイナリ (`musubi-server`, `musubi-cli`, `mock-snmp-agent`) コンパイル |
+| `make build` | `bin/` 配下への全実行可能バイナリ (`musubi-server`, `musubi-cli`, `mock-snmp-agent`, `musubi-web`) コンパイル |
+| `make frontend-e2e`| ヘッドレス Chrome による HTMX フロントエンド E2E 自動検証 & スナップショット生成 |
+| `make ssg-build` | オフライン閲覧・監査証跡用 HTML 静的サイト生成 (SSG) |
 | `make docker-test` | Docker Compose 環境での E2E 自動検証スクリプト実行 |
 | `make sqlite-e2e` | Docker 不要の純 Go スタック（SQLite + Mock Agent）による E2E 自動検証スクリプト実行 |
 | `make openapi-lint` | Spectral による OpenAPI 3.1 スキーマ文法検証 |

@@ -787,6 +787,40 @@ paths:
   # ==========================================
   # Jobs
   # ==========================================
+  /v1/jobs:
+    get:
+      summary: List Job Executions
+      description: Retrieve history of scenario execution jobs.
+      operationId: listJobs
+      tags:
+        - Jobs
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List of jobs
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - items
+                  - total
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/JobDetail'
+                  total:
+                    type: integer
+                    example: 5
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+
   /v1/jobs/{id}:
     get:
       summary: Get Job Execution Status

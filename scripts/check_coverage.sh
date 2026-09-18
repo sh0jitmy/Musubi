@@ -6,14 +6,14 @@ set -e
 
 # 全 internal パッケージのテスト実行とカバレッジプロファイルの出力
 echo "==> Running tests with coverage profile..."
-go test -v -race -coverprofile=coverage.out ./internal/collector/... ./internal/state/... ./internal/orchestrator/... ./internal/gateway/... ./internal/common/... ./internal/database/... ./internal/testutil/...
+go test -v -race -coverprofile=coverage.out ./internal/collector/... ./internal/state/... ./internal/orchestrator/... ./internal/gateway/... ./internal/common/... ./internal/database/... ./internal/testutil/... ./internal/web/...
 
 # internal 配下の合計ステートメントカバー率を検証
-echo "==> Verifying business logic coverage (internal/collector, internal/state, internal/orchestrator, internal/gateway, internal/common)..."
+echo "==> Verifying business logic coverage (internal/collector, internal/state, internal/orchestrator, internal/gateway, internal/common, internal/web)..."
 awk '
 BEGIN { total = 0; covered = 0; }
 /:/ {
-    if ($0 ~ /\/internal\/(collector|state|orchestrator|gateway|common)\//) {
+    if ($0 ~ /\/internal\/(collector|state|orchestrator|gateway|common|web)\//) {
         total += $2;
         if ($3 > 0) {
             covered += $2;

@@ -1,0 +1,65 @@
+{{define "targets_table"}}
+<div class="table-wrapper">
+    <table>
+        <thead>
+            <tr>
+                <th>Target Name</th>
+                <th>Host Address</th>
+                <th>SNMP Port</th>
+                <th>Real-time Status</th>
+                <th>Credential Profile</th>
+                <th>Last Heartbeat</th>
+                <th style="text-align: right;">Quick Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{if .Targets}}
+                {{range .Targets}}
+                <tr id="target-row-{{.Name}}">
+                    <td><strong>{{.Name}}</strong></td>
+                    <td><code>{{.Host}}</code></td>
+                    <td>{{.Port}}</td>
+                    <td>
+                        {{if eq .Status "ONLINE"}}
+                            <span class="badge badge-success">ONLINE</span>
+                        {{else if eq .Status "DRAINING"}}
+                            <span class="badge badge-warning">DRAINING</span>
+                        {{else if eq .Status "DELETED"}}
+                            <span class="badge badge-danger">DELETED</span>
+                        {{else}}
+                            <span class="badge badge-info">{{.Status}}</span>
+                        {{end}}
+                    </td>
+                    <td><code>{{.CredentialID}}</code></td>
+                    <td style="color: var(--text-secondary); font-size: 12px;">{{.UpdatedAtFormatted}}</td>
+                    <td style="text-align: right;">
+                        <button class="btn btn-secondary btn-sm"
+                                hx-post="/ui/targets/{{.Name}}/ping"
+                                hx-target="#target-row-{{.Name}}"
+                                hx-swap="outerHTML"
+                                title="Send SNMP ping test">
+                            ⚡ Ping
+                        </button>
+                        {{if eq .Status "ONLINE"}}
+                        <button class="btn btn-secondary btn-sm"
+                                hx-post="/ui/targets/{{.Name}}/drain"
+                                hx-target="#target-row-{{.Name}}"
+                                hx-swap="outerHTML"
+                                title="Drain target for maintenance">
+                            🛑 Drain
+                        </button>
+                        {{end}}
+                    </td>
+                </tr>
+                {{end}}
+            {{else}}
+                <tr>
+                    <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 24px;">
+                        登録されているターゲットはありません。
+                    </td>
+                </tr>
+            {{end}}
+        </tbody>
+    </table>
+</div>
+{{end}}

@@ -1,0 +1,35 @@
+{{define "job_status"}}
+<div id="job-status-card-{{.ID}}"
+     class="metric-card"
+     {{if or (eq .Status "RUNNING") (eq .Status "QUEUED")}}
+     hx-get="/ui/jobs/{{.ID}}/status"
+     hx-trigger="every 1s"
+     hx-swap="outerHTML"
+     {{end}}
+     style="margin-bottom: 16px; border-color: {{if eq .Status "SUCCESS"}}var(--success){{else if eq .Status "FAILED"}}var(--danger){{else}}var(--accent-primary){{end}};">
+    <div class="metric-header">
+        <span class="metric-title">Job Execution: {{.ScenarioID}} (ID: <code>{{.ID}}</code>)</span>
+        <div>
+            {{if eq .Status "SUCCESS"}}
+                <span class="badge badge-success">✅ COMPLETED (SUCCESS)</span>
+            {{else if eq .Status "FAILED"}}
+                <span class="badge badge-danger">❌ FAILED</span>
+            {{else if eq .Status "RUNNING"}}
+                <span class="badge badge-warning">⚡ EXECUTING...</span>
+            {{else if eq .Status "QUEUED"}}
+                <span class="badge badge-info">⏳ QUEUED</span>
+            {{else}}
+                <span class="badge badge-info">{{.Status}}</span>
+            {{end}}
+        </div>
+    </div>
+    <div style="font-size: 13px; color: var(--text-secondary); margin-top: 6px;">
+        <span>Triggered by: <strong>{{.TriggeredBy}}</strong> | Started: {{.CreatedAtFormatted}}</span>
+    </div>
+    {{if .ErrorMsg}}
+    <div style="margin-top: 8px; color: var(--danger); font-size: 12px; font-family: var(--font-mono);">
+        Error: {{.ErrorMsg}}
+    </div>
+    {{end}}
+</div>
+{{end}}

@@ -1,0 +1,60 @@
+{{define "layout"}}
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.Title}} - Musubi Autonomous Network Orchestration</title>
+    <link rel="stylesheet" href="/static/css/dashboard.css">
+    <script src="/static/js/htmx.min.js"></script>
+    <script src="/static/js/dashboard.js"></script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Top Navigation Bar -->
+        <header class="navbar">
+            <a href="/" class="brand-section">
+                <div class="brand-logo">結</div>
+                <div class="brand-meta">
+                    <h1>Musubi Dashboard <span class="badge badge-info">v0.1.0</span></h1>
+                    <p>Air-Gapped & Standalone Network Orchestration</p>
+                </div>
+            </a>
+
+            <nav class="nav-links">
+                <a href="/" class="nav-link {{if eq .ActiveNav "overview"}}active{{end}}">
+                    📊 統合ダッシュボード (Overview)
+                </a>
+                <a href="/scenarios" class="nav-link {{if eq .ActiveNav "scenarios"}}active{{end}}">
+                    ⚡ シナリオスタジオ (Scenario Studio)
+                </a>
+            </nav>
+
+            <div class="nav-status">
+                <span class="status-badge">
+                    <span class="pulse-dot"></span>
+                    <span>ONLINE (No-Docker)</span>
+                </span>
+                <span style="font-size: 12px; color: var(--text-secondary); font-family: var(--font-mono);" id="live-clock">
+                    --:--:--
+                </span>
+            </div>
+        </header>
+
+        <!-- Main Content Slot -->
+        <main>
+            {{if eq .ActiveNav "overview"}}
+                {{template "dashboard_content" .}}
+            {{else if eq .ActiveNav "scenarios"}}
+                {{template "scenarios_content" .}}
+            {{end}}
+        </main>
+
+        <!-- Footer -->
+        <footer>
+            Musubi Autonomous Network Orchestration & Telemetry Gateway | 100% Go & HTMX (Docker-Free Air-Gapped)
+        </footer>
+    </div>
+</body>
+</html>
+{{end}}

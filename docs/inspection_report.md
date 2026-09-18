@@ -37,6 +37,7 @@
   - `golang-design`
 - **具体的な証跡**:
   - [0001-go-template-repository-design.md](adr/0001-go-template-repository-design.md) (ステータス: 承認済み (Accepted))
+  - [0003-standalone-htmx-frontend-architecture.md](adr/0003-standalone-htmx-frontend-architecture.md) (ステータス: 承認済み (Accepted))
 
 ### 2.2 実装・コード品質フェーズ (Implementation & Quality)
 - **検証結果**: **適合**
@@ -46,29 +47,42 @@
   - `internal/api/handler.go` による OpenAPI インターフェース実装、`slog` のマスキング処理、OTelトレースID自動注入、および `log_type: "audit"` 監査ログの付与。
   - `internal/api/middleware.go` による Bearer 認証、HTTPS 常時暗号化（`autocert`）、HSTS ヘッダー付与、および OTel Metrics API による HTTP リクエストの計装。
   - `internal/api/server.go` での OTel Prometheus Exporter 統合と `/metrics` エンドポイント公開。
+  - `cmd/musubi-web/main.go` による軽量Webフロントエンドのエントリーポイント、BFFプロキシ、SSG静的生成エンジンの統合。
+  - `internal/web/server.go`, `internal/web/client.go`, `internal/web/ssg.go` による HTMX コンポーネントハンドラ、REST/Prometheus クライアント、SSG ファイル書き出し。
+  - `internal/web/static/` への HTMX 1.9.12 ローカル vendoring による完全エアギャップ・ゼロ CDN 稼働。
   - `check_license.py` による Go ソースファイルのライセンス・作成者ヘッダーの自動付与および監査。
 - **適用されたカスタムスキル**:
   - `golang-design`
   - `golang-implementation`
   - `database-design`
   - `golang-observability`
+  - `modern-web-guidance`
 - **具体的な証跡**:
   - `cmd/app/main.go`
+  - `cmd/musubi-web/main.go`
   - `internal/database/db.go`
   - `internal/api/handler.go`
   - `internal/api/middleware.go`
   - `internal/api/server.go`
+  - `internal/web/`
   - `scripts/check_license.py`
 
 ### 2.3 テスト・E2Eフェーズ (Testing & E2E Verification)
 - **検証結果**: **適合**
 - **実施されたプロセス**:
   - `main_test.go` における `goleak` メモリリーク検出およびインメモリ SQLite データベースを用いた結合E2Eテスト。
+  - `internal/web/server_test.go` における HTMX テンプレート描画、BFF エラーハンドリング、SSG書き出し、`goleak` メモリリーク検証、87.5% テストカバレッジ。
+  - `scripts/test_frontend_ui.py` および `scripts/frontend_e2e.sh` によるヘッドレス Chrome E2E UI 自動検証、全画面スナップショット取得（1920x1280）、HTML レポート生成。
   - 静的解析リンターのクリア。
 - **適用されたカスタムスキル**:
   - `golang-e2e-testing`
 - **具体的な証跡**:
   - `cmd/app/main_test.go`
+  - `internal/web/server_test.go`
+  - `scripts/test_frontend_ui.py`
+  - `docs/images/frontend_dashboard.png`
+  - `docs/images/frontend_scenarios.png`
+  - `test_reports/frontend_e2e_report.html`
 
 ### 2.4 CI/CD統合フェーズ (CI/CD Integration)
 - **検証結果**: **適合**
@@ -122,6 +136,10 @@
 | **R-2.14** | OTel ログ戦略と監査ログ分離 | 適合。相関トレースID/スパンIDの自動付与および `log_type: "audit"` での監査証跡分離。 | `internal/api/handler.go` |
 | **R-2.15** | OTel メトリクス計装 | 適合。OTel Metrics API を用いた HTTP リクエスト数・処理遅延の計装と Prometheus Exporter 公開。 | `internal/api/middleware.go`<br>`internal/api/server.go` |
 | **R-2.16** | 安全な pprof プロファイリング | 適合。外部公開を防ぎ `127.0.0.1:6060` (localhostのみ) にバインドした安全な有効化。 | `cmd/app/main.go` |
+| **R-3.1** | Docker不要スタンドアロン Web UI | 適合。Go 組み込み HTMX Web サーバー (`cmd/musubi-web`) による Grafana 代替可視化とシナリオ対話スタジオ。 | `cmd/musubi-web/main.go`<br>`internal/web/` |
+| **R-3.2** | 完全エアギャップ・ゼロ外部CDN | 適合。ローカル vendored な HTMX 1.9.12 と `embed.FS` によるオフライン完結。 | `internal/web/static/` |
+| **R-3.3** | SSG (静的サイト生成) エクスポート | 適合。`--ssg-export` フラグによる完全スタンドアロン HTML/CSS/JS 書き出し。 | `internal/web/ssg.go` |
+| **R-3.4** | ヘッドレス Chrome E2E UI テスト & スナップショット | 適合。`make frontend-e2e` によるダッシュボード・シナリオスタジオの自動検証と画像生成。 | `scripts/test_frontend_ui.py`<br>`docs/images/` |
 
 ---
 
@@ -141,3 +159,13 @@
 | `cmd/app/main_test.go` | `TestE2E_AppAPI` | 結合・E2Eテスト | `/metrics` エンドポイントからの OTel Prometheus メトリクス定義の正常出力の検証 | **PASS** |
 | `cmd/app/main_test.go` | `TestE2E_AppAPI` | 結合・E2Eテスト | `127.0.0.1:6060/debug/pprof/` でのプロファイリング機能の動作確認の検証 | **PASS** |
 | `cmd/app/main_test.go` | `TestMain` | リソース安全性 | `goleak` によるゴルーチンリークの検出 | **PASS** |
+| `internal/web/server_test.go` | `TestServer_Dashboard_Render` | 単体・結合テスト | ダッシュボード HTML 正常描画、各メトリクス・テーブル・ポーリング要素の包含確認 | **PASS** |
+| `internal/web/server_test.go` | `TestServer_Scenarios_Render` | 単体・結合テスト | シナリオスタジオ HTML 正常描画、エディタ textarea、プリセットボタンの検証 | **PASS** |
+| `internal/web/server_test.go` | `TestServer_Components_HTMX` | 単体・結合テスト | 各HTMXパーシャルコンポーネント（システムメトリクス、ターゲット、MIB、ジョブ、監査）の部分描画 | **PASS** |
+| `internal/web/server_test.go` | `TestServer_StaticFiles` | 単体・結合テスト | ローカル vendored `htmx.min.js`, `dashboard.css`, `dashboard.js` の正常配信確認 | **PASS** |
+| `internal/web/server_test.go` | `TestExportStaticSite` | 単体・結合テスト | SSG 静的エクスポート（`index.html`, `scenarios.html`, 静的アセット）のファイル生成検証 | **PASS** |
+| `scripts/test_frontend_ui.py` | `test_dashboard_page` | E2E・UIテスト | ダッシュボード画面表示、HTMX 自動ポーリング属性、CSS/JS 正常ロード、スナップショット生成 | **PASS** |
+| `scripts/test_frontend_ui.py` | `test_scenarios_studio` | E2E・UIテスト | シナリオスタジオ画面表示、YAML エディタ textarea、プリセット、スナップショット生成 | **PASS** |
+| `scripts/test_frontend_ui.py` | `test_preset_injection` | E2E・UIテスト | プリセットクリック時のエディタ自動入力と構文検証ボタンの動作 | **PASS** |
+| `scripts/test_frontend_ui.py` | `test_syntax_validation` | E2E・UIテスト | YAML 構文エラー時および正常時のバリデーションバッジ・エラーメッセージ表示 | **PASS** |
+| `scripts/test_frontend_ui.py` | `test_adhoc_run_polling` | E2E・UIテスト | アドホックシナリオ即時実行、ジョブID発番、HTMXポーリングによるステータス遷移（SUCCESS）確認 | **PASS** |
